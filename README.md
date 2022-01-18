@@ -16,7 +16,7 @@
 - :heavy_check_mark: `DATE`
 - :construction: `LIST`
 - :heavy_check_mark: `LIST NEWSGROUPS`
-- :construction: `MODE READER`
+- :heavy_check_mark: `MODE READER`
 - :heavy_check_mark: `QUIT`
 - :x: `ARTICLE`
 - :x: `BODY`
