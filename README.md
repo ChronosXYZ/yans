@@ -18,6 +18,7 @@
 - :heavy_check_mark: `LIST NEWSGROUPS`
 - :construction: `MODE READER`
 - :heavy_check_mark: `QUIT`
+- :x: `ARTICLE`
 - :x: `BODY`
 - :x: `GROUP`
 - :x: `HDR`
