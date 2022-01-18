@@ -1,10 +1,10 @@
 package server
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"github.com/ChronosX88/yans/internal"
+	"github.com/ChronosX88/yans/internal/common"
 	"github.com/ChronosX88/yans/internal/config"
 	"github.com/ChronosX88/yans/internal/models"
 	"github.com/ChronosX88/yans/internal/protocol"
@@ -14,8 +14,18 @@ import (
 	"io"
 	"log"
 	"net"
+	"net/textproto"
 	"strings"
 	"time"
+)
+
+var (
+	Capabilities = protocol.Capabilities{
+		{Type: protocol.VersionCapability, Params: "2"},
+		{Type: protocol.ImplementationCapability, Params: fmt.Sprintf("%s %s", common.ServerName, common.ServerVersion)},
+		{Type: protocol.ModeReaderCapability},
+		{Type: protocol.ListCapability, Params: "ACTIVE NEWSGROUPS"},
+	}
 )
 
 type NNTPServer struct {
@@ -81,19 +91,21 @@ func (ns *NNTPServer) Start() error {
 }
 
 func (ns *NNTPServer) handleNewConnection(ctx context.Context, conn net.Conn) {
-	_, err := conn.Write([]byte(protocol.MessageNNTPServiceReadyPostingProhibited))
+	_, err := conn.Write([]byte(protocol.MessageNNTPServiceReadyPostingProhibited + protocol.CRLF))
 	if err != nil {
 		log.Print(err)
 		conn.Close()
 		return
 	}
+
+	tconn := textproto.NewConn(conn)
 	for {
 		select {
 		case <-ctx.Done():
 			break
 		default:
 			{
-				message, err := bufio.NewReader(conn).ReadString('\n')
+				message, err := tconn.ReadLine()
 				if err != nil {
 					if err == io.EOF || err.(*net.OpError).Unwrap() == net.ErrClosed {
 						log.Printf("Client %s has diconnected!", conn.RemoteAddr().String())
@@ -104,7 +116,7 @@ func (ns *NNTPServer) handleNewConnection(ctx context.Context, conn net.Conn) {
 					return
 				}
 				log.Printf("Received message from %s: %s", conn.RemoteAddr().String(), string(message))
-				err = ns.handleMessage(conn, message)
+				err = ns.handleMessage(tconn, message)
 				if err != nil {
 					log.Print(err)
 					conn.Close()
@@ -115,8 +127,7 @@ func (ns *NNTPServer) handleNewConnection(ctx context.Context, conn net.Conn) {
 	}
 }
 
-func (ns *NNTPServer) handleMessage(conn net.Conn, msg string) error {
-	msg = strings.TrimSuffix(msg, "\r\n")
+func (ns *NNTPServer) handleMessage(conn *textproto.Conn, msg string) error {
 	splittedMessage := strings.Split(msg, " ")
 	command := splittedMessage[0]
 
@@ -126,7 +137,7 @@ func (ns *NNTPServer) handleMessage(conn net.Conn, msg string) error {
 	switch command {
 	case protocol.CommandCapabilities:
 		{
-			reply = "101 Capability list:\r\nVERSION 2\r\nIMPLEMENTATION\r\n."
+			reply = Capabilities.String()
 			break
 		}
 	case protocol.CommandDate:
@@ -158,11 +169,11 @@ func (ns *NNTPServer) handleMessage(conn net.Conn, msg string) error {
 				log.Println(err)
 			}
 			sb := strings.Builder{}
-			sb.Write([]byte("215 list of newsgroups follows\n"))
+			sb.Write([]byte(protocol.MessageListOfNewsgroupsFollows + protocol.CRLF))
 			if len(splittedMessage) == 1 || splittedMessage[1] == "ACTIVE" {
 				for _, v := range groups {
 					// TODO set high/low mark and posting status to actual values
-					sb.Write([]byte(fmt.Sprintf("%s 0 0 n\r\n", v.GroupName)))
+					sb.Write([]byte(fmt.Sprintf("%s 0 0 n"+protocol.CRLF, v.GroupName)))
 				}
 			} else if splittedMessage[1] == "NEWSGROUPS" {
 				for _, v := range groups {
@@ -189,7 +200,7 @@ func (ns *NNTPServer) handleMessage(conn net.Conn, msg string) error {
 		}
 	}
 
-	_, err := conn.Write([]byte(reply + "\r\n"))
+	err := conn.PrintfLine(reply)
 	if quit {
 		conn.Close()
 	}
