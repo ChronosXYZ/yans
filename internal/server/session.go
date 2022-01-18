@@ -9,6 +9,13 @@ import (
 	"net/textproto"
 )
 
+type SessionMode int
+
+const (
+	SessionModeTransit = iota
+	SessionModeReader
+)
+
 type Session struct {
 	ctx          context.Context
 	capabilities protocol.Capabilities
@@ -17,6 +24,7 @@ type Session struct {
 	id           string
 	closed       chan<- bool
 	h            *Handler
+	mode         SessionMode
 }
 
 func NewSession(ctx context.Context, conn net.Conn, caps protocol.Capabilities, id string, closed chan<- bool, handler *Handler) (*Session, error) {
@@ -37,6 +45,7 @@ func NewSession(ctx context.Context, conn net.Conn, caps protocol.Capabilities, 
 		id:           id,
 		closed:       closed,
 		h:            handler,
+		mode:         SessionModeTransit,
 	}
 
 	go s.loop()
@@ -49,7 +58,7 @@ func (s *Session) loop() {
 		close(s.closed)
 	}()
 
-	err := s.tconn.PrintfLine(protocol.MessageReaderModePostingProhibited) // by default access mode is read-only
+	err := s.tconn.PrintfLine(protocol.MessageNNTPServiceReadyPostingProhibited) // by default access mode is read-only
 	if err != nil {
 		s.conn.Close()
 		return

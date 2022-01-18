@@ -33,4 +33,5 @@ const (
 	MessageUnknownCommand                    = "500 Unknown command"
 	MessageErrorHappened                     = "403 Failed to process command:"
 	MessageListOfNewsgroupsFollows           = "215 list of newsgroups follows"
+	MessageSyntaxError                       = "501 Syntax Error"
 )

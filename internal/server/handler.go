@@ -22,12 +22,13 @@ func NewHandler(db *sqlx.DB) *Handler {
 		protocol.CommandDate:         h.handleDate,
 		protocol.CommandQuit:         h.handleQuit,
 		protocol.CommandList:         h.handleList,
+		protocol.CommandMode:         h.handleModeReader,
 	}
 	return h
 }
 
 func (h *Handler) handleCapabilities(s *Session, arguments []string) error {
-	return s.tconn.PrintfLine(Capabilities.String())
+	return s.tconn.PrintfLine(s.capabilities.String())
 }
 
 func (h *Handler) handleDate(s *Session, arguments []string) error {
@@ -81,13 +82,25 @@ func (h *Handler) handleList(s *Session, arguments []string) error {
 		}
 	default:
 		{
-			return s.tconn.PrintfLine(protocol.MessageUnknownCommand)
+			return s.tconn.PrintfLine(protocol.MessageSyntaxError)
 		}
 	}
 
 	sb.Write([]byte(protocol.MultilineEnding))
 
 	return s.tconn.PrintfLine(sb.String())
+}
+
+func (h *Handler) handleModeReader(s *Session, arguments []string) error {
+	if len(arguments) == 0 || arguments[0] != "READER" {
+		return s.tconn.PrintfLine(protocol.MessageSyntaxError)
+	}
+
+	(&s.capabilities).Remove(protocol.ModeReaderCapability)
+	(&s.capabilities).Add(protocol.Capability{Type: protocol.ReaderCapability})
+	s.mode = SessionModeReader
+
+	return s.tconn.PrintfLine(protocol.MessageReaderModePostingProhibited) // TODO vary on auth status
 }
 
 func (h *Handler) Handle(s *Session, message string) error {
