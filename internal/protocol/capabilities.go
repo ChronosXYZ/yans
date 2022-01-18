@@ -54,13 +54,21 @@ type Capability struct {
 
 type Capabilities []Capability
 
-func (cs Capabilities) Add(c Capability) {
-	for _, v := range cs {
+func (cs *Capabilities) Add(c Capability) {
+	for _, v := range *cs {
 		if v.Type == c.Type {
 			return // allowed only unique items
 		}
 	}
-	cs = append(cs, c)
+	*cs = append(*cs, c)
+}
+
+func (cs *Capabilities) Remove(ct CapabilityType) {
+	for i, v := range *cs {
+		if v.Type == ct {
+			*cs = append((*cs)[:i], (*cs)[i+1:]...)
+		}
+	}
 }
 
 func (cs Capabilities) String() string {
