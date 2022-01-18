@@ -97,7 +97,9 @@ func (h *Handler) handleModeReader(s *Session, arguments []string) error {
 	}
 
 	(&s.capabilities).Remove(protocol.ModeReaderCapability)
+	(&s.capabilities).Remove(protocol.ListCapability)
 	(&s.capabilities).Add(protocol.Capability{Type: protocol.ReaderCapability})
+	(&s.capabilities).Add(protocol.Capability{Type: protocol.ListCapability, Params: "ACTIVE NEWSGROUPS"})
 	s.mode = SessionModeReader
 
 	return s.tconn.PrintfLine(protocol.MessageReaderModePostingProhibited) // TODO vary on auth status
