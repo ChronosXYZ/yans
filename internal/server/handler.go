@@ -2,21 +2,20 @@ package server
 
 import (
 	"fmt"
-	"github.com/ChronosX88/yans/internal/models"
+	"github.com/ChronosX88/yans/internal/backend"
 	"github.com/ChronosX88/yans/internal/protocol"
-	"github.com/jmoiron/sqlx"
 	"strings"
 	"time"
 )
 
 type Handler struct {
 	handlers map[string]func(s *Session, arguments []string) error
-	db       *sqlx.DB
+	backend  backend.StorageBackend
 }
 
-func NewHandler(db *sqlx.DB) *Handler {
+func NewHandler(b backend.StorageBackend) *Handler {
 	h := &Handler{}
-	h.db = db
+	h.backend = b
 	h.handlers = map[string]func(s *Session, arguments []string) error{
 		protocol.CommandCapabilities: h.handleCapabilities,
 		protocol.CommandDate:         h.handleDate,
@@ -54,7 +53,7 @@ func (h *Handler) handleList(s *Session, arguments []string) error {
 		fallthrough
 	case "ACTIVE":
 		{
-			groups, err := h.listGroups()
+			groups, err := h.backend.ListGroups()
 			if err != nil {
 				return err
 			}
@@ -66,7 +65,7 @@ func (h *Handler) handleList(s *Session, arguments []string) error {
 		}
 	case "NEWSGROUPS":
 		{
-			groups, err := h.listGroups()
+			groups, err := h.backend.ListGroups()
 			if err != nil {
 				return err
 			}
@@ -116,15 +115,4 @@ func (h *Handler) Handle(s *Session, message string) error {
 		return s.tconn.PrintfLine(protocol.MessageUnknownCommand)
 	}
 	return handler(s, splittedMessage[1:])
-}
-
-// TODO Refactor to "storage backend" entity
-func (h *Handler) listGroups() ([]models.Group, error) {
-	var groups []models.Group
-	return groups, h.db.Select(&groups, "SELECT * FROM groups")
-}
-
-func (h *Handler) getArticlesCount(g models.Group) (int, error) {
-	var count int
-	return count, h.db.Select(&count, "SELECT COUNT(*) FROM articles_to_groups WHERE group_id = ?", g.ID)
 }

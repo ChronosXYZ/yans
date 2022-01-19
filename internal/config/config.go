@@ -5,9 +5,19 @@ import (
 	"os"
 )
 
+const (
+	SQLiteBackendType = "sqlite"
+)
+
 type Config struct {
-	Port         int
-	DatabasePath string
+	Address     string              `toml:"address"`
+	Port        int                 `toml:"port"`
+	BackendType string              `toml:"backend_type"`
+	SQLite      SQLiteBackendConfig `toml:"sqlite"`
+}
+
+type SQLiteBackendConfig struct {
+	Path string `toml:"path"`
 }
 
 func ParseConfig(path string) (Config, error) {

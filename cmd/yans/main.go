@@ -30,11 +30,11 @@ func main() {
 	log.Printf("Starting %s...", common.ServerName)
 	ns, err := server.NewNNTPServer(cfg)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error occurred while starting the server: %s", err)
 	}
 
 	if err := ns.Start(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error occurred while starting the server: %s", err)
 	}
 	log.Printf("%s has been successfully started!", common.ServerName)
 	log.Printf("Version: %s", common.ServerVersion)

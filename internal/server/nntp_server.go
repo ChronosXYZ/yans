@@ -3,14 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/ChronosX88/yans/internal"
+	"github.com/ChronosX88/yans/internal/backend"
+	"github.com/ChronosX88/yans/internal/backend/sqlite"
 	"github.com/ChronosX88/yans/internal/common"
 	"github.com/ChronosX88/yans/internal/config"
 	"github.com/ChronosX88/yans/internal/protocol"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/pressly/goose/v3"
 	"log"
 	"net"
 	"sync"
@@ -28,27 +26,18 @@ type NNTPServer struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 
-	ln   net.Listener
-	port int
+	ln  net.Listener
+	cfg config.Config
 
-	db *sqlx.DB
+	backend backend.StorageBackend
 
 	sessionPool      map[string]*Session
 	sessionPoolMutex sync.Mutex
 }
 
 func NewNNTPServer(cfg config.Config) (*NNTPServer, error) {
-	db, err := sqlx.Open("sqlite3", cfg.DatabasePath)
+	b, err := initBackend(cfg)
 	if err != nil {
-		return nil, err
-	}
-	goose.SetBaseFS(internal.Migrations)
-
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		return nil, err
-	}
-
-	if err := goose.Up(db.DB, "migrations"); err != nil {
 		return nil, err
 	}
 
@@ -56,18 +45,41 @@ func NewNNTPServer(cfg config.Config) (*NNTPServer, error) {
 	ns := &NNTPServer{
 		ctx:         ctx,
 		cancelFunc:  cancel,
-		port:        cfg.Port,
-		db:          db,
+		cfg:         cfg,
+		backend:     b,
 		sessionPool: map[string]*Session{},
 	}
 	return ns, nil
 }
 
+func initBackend(cfg config.Config) (backend.StorageBackend, error) {
+	var sb backend.StorageBackend
+
+	switch cfg.BackendType {
+	case config.SQLiteBackendType:
+		{
+			sqliteBackend, err := sqlite.NewSQLiteBackend(cfg.SQLite)
+			if err != nil {
+				return nil, err
+			}
+			sb = sqliteBackend
+		}
+	default:
+		{
+			return nil, fmt.Errorf("invalid backend type, supported backends: %s", backend.SupportedBackendList)
+		}
+	}
+	return sb, nil
+}
+
 func (ns *NNTPServer) Start() error {
-	ln, err := net.Listen("tcp", fmt.Sprintf(":%d", ns.port))
+	address := fmt.Sprintf("%s:%d", ns.cfg.Address, ns.cfg.Port)
+	ln, err := net.Listen("tcp", address)
 	if err != nil {
 		return err
 	}
+
+	log.Printf("Listening on %s...", address)
 
 	go func(ctx context.Context) {
 		for {
@@ -84,7 +96,7 @@ func (ns *NNTPServer) Start() error {
 
 					id, _ := uuid.NewUUID()
 					closed := make(chan bool)
-					session, err := NewSession(ctx, conn, Capabilities, id.String(), closed, NewHandler(ns.db))
+					session, err := NewSession(ctx, conn, Capabilities, id.String(), closed, NewHandler(ns.backend))
 					ns.sessionPoolMutex.Lock()
 					ns.sessionPool[id.String()] = session
 					ns.sessionPoolMutex.Unlock()
