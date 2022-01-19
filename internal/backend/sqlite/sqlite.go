@@ -43,5 +43,15 @@ func (sb *SQLiteBackend) ListGroups() ([]models.Group, error) {
 
 func (sb *SQLiteBackend) GetArticlesCount(g models.Group) (int, error) {
 	var count int
-	return count, sb.db.Select(&count, "SELECT COUNT(*) FROM articles_to_groups WHERE group_id = ?", g.ID)
+	return count, sb.db.Get(&count, "SELECT COUNT(*) FROM articles_to_groups WHERE group_id = ?", g.ID)
+}
+
+func (sb *SQLiteBackend) GetGroupHighWaterMark(g models.Group) (int, error) {
+	var waterMark int
+	return waterMark, sb.db.Get(&waterMark, "SELECT article_id FROM articles_to_groups WHERE group_id = ? ORDER BY article_id DESC LIMIT 1", g.ID)
+}
+
+func (sb *SQLiteBackend) GetGroupLowWaterMark(g models.Group) (int, error) {
+	var waterMark int
+	return waterMark, sb.db.Get(&waterMark, "SELECT article_id FROM articles_to_groups WHERE group_id = ? ORDER BY article_id LIMIT 1", g.ID)
 }

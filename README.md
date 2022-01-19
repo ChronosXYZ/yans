@@ -14,7 +14,7 @@
 #### Commands
 - :heavy_check_mark: `CAPABILITIES`
 - :heavy_check_mark: `DATE`
-- :construction: `LIST`
+- :heavy_check_mark: `LIST ACTIVE`
 - :heavy_check_mark: `LIST NEWSGROUPS`
 - :heavy_check_mark: `MODE READER`
 - :heavy_check_mark: `QUIT`

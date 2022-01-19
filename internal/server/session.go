@@ -70,6 +70,8 @@ func (s *Session) loop() {
 			break
 		default:
 			{
+				id := s.tconn.Next()
+				s.tconn.StartRequest(id)
 				message, err := s.tconn.ReadLine()
 				if err != nil {
 					if err == io.EOF || err.(*net.OpError).Unwrap() == net.ErrClosed {
@@ -80,8 +82,9 @@ func (s *Session) loop() {
 					}
 					return
 				}
+				s.tconn.EndRequest(id)
 				log.Printf("Received message from %s: %s", s.conn.RemoteAddr().String(), message) // for debugging
-				err = s.h.Handle(s, message)
+				err = s.h.Handle(s, message, id)
 				if err != nil {
 					log.Print(err)
 					s.tconn.PrintfLine("%s %s", protocol.MessageErrorHappened, err.Error())

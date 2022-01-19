@@ -3,10 +3,11 @@
 CREATE TABLE IF NOT EXISTS groups(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_name TEXT UNIQUE NOT NULL,
-    description TEXT
+    description TEXT,
+    created_at UNSIGNED BIG INT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS articles(
-    id TEXT PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     date INTEGER NOT NULL,
     path TEXT,
     reply_to TEXT,
@@ -15,7 +16,7 @@ CREATE TABLE IF NOT EXISTS articles(
     body TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS articles_to_groups(
-    article_id TEXT NOT NULL,
+    article_id INTEGER NOT NULL,
     group_id INTEGER NOT NULL,
     FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE

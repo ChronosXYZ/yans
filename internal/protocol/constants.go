@@ -29,7 +29,7 @@ const (
 const (
 	MessageNNTPServiceReadyPostingProhibited = "201 YANS NNTP Service Ready, posting prohibited"
 	MessageReaderModePostingProhibited       = "201 Reader mode, posting prohibited"
-	MessageNNTPServiceExitsNormally          = "205 NNTP Service exits normally"
+	MessageNNTPServiceExitsNormally          = "205 NNTP Service exits normally, bye!"
 	MessageUnknownCommand                    = "500 Unknown command"
 	MessageErrorHappened                     = "403 Failed to process command:"
 	MessageListOfNewsgroupsFollows           = "215 list of newsgroups follows"
