@@ -12,7 +12,7 @@
 - :x: Authentication
 
 #### Commands
-- :construction: `CAPABILITIES`
+- :heavy_check_mark: `CAPABILITIES`
 - :heavy_check_mark: `DATE`
 - :construction: `LIST`
 - :heavy_check_mark: `LIST NEWSGROUPS`
