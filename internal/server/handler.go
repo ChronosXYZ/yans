@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"github.com/ChronosX88/yans/internal/backend"
+	"github.com/ChronosX88/yans/internal/models"
 	"github.com/ChronosX88/yans/internal/protocol"
 	"strings"
 	"time"
@@ -60,13 +61,20 @@ func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
 		fallthrough
 	case "ACTIVE":
 		{
-			groups, err := h.backend.ListGroups()
+			var groups []models.Group
+			var err error
+			if len(arguments) == 2 {
+				groups, err = h.backend.ListGroupsByPattern(arguments[1])
+			} else {
+				groups, err = h.backend.ListGroups()
+			}
+
 			if err != nil {
 				return err
 			}
 			sb.Write([]byte(protocol.MessageListOfNewsgroupsFollows + protocol.CRLF))
 			for _, v := range groups {
-				// TODO set high/low mark and posting status to actual values
+				// TODO set actual post permission status
 				c, err := h.backend.GetArticlesCount(v)
 				if err != nil {
 					return err
@@ -82,16 +90,24 @@ func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
 					}
 					sb.Write([]byte(fmt.Sprintf("%s %d %d n"+protocol.CRLF, v.GroupName, highWaterMark, lowWaterMark)))
 				} else {
-					sb.Write([]byte(fmt.Sprintf("%s 0 0 n"+protocol.CRLF, v.GroupName)))
+					sb.Write([]byte(fmt.Sprintf("%s 0 1 n"+protocol.CRLF, v.GroupName)))
 				}
 			}
 		}
 	case "NEWSGROUPS":
 		{
-			groups, err := h.backend.ListGroups()
+			var groups []models.Group
+			var err error
+			if len(arguments) == 2 {
+				groups, err = h.backend.ListGroupsByPattern(arguments[1])
+			} else {
+				groups, err = h.backend.ListGroups()
+			}
 			if err != nil {
 				return err
 			}
+
+			sb.Write([]byte(protocol.MessageListOfNewsgroupsFollows + protocol.CRLF))
 			for _, v := range groups {
 				desc := ""
 				if v.Description == nil {

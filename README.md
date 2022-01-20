@@ -6,6 +6,7 @@
 
 ### Features
 
+- :heavy_check_mark: Wildmat support
 - :heavy_check_mark: Database (SQLite)
 - :construction: Articles posting
 - :x: Transit mode

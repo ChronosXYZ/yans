@@ -10,4 +10,7 @@ require (
 	github.com/pressly/goose/v3 v3.5.0
 )
 
-require github.com/pkg/errors v0.9.1 // indirect
+require (
+	github.com/dlclark/regexp2 v1.4.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
+)
