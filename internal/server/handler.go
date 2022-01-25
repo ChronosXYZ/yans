@@ -25,6 +25,7 @@ func NewHandler(b backend.StorageBackend) *Handler {
 		protocol.CommandList:         h.handleList,
 		protocol.CommandMode:         h.handleModeReader,
 		protocol.CommandGroup:        h.handleGroup,
+		protocol.CommandNewGroups:    h.handleNewGroups,
 	}
 	return h
 }
@@ -157,25 +158,90 @@ func (h *Handler) handleGroup(s *Session, arguments []string, id uint) error {
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return s.tconn.PrintfLine(protocol.MessageNoSuchGroup)
+		} else {
+			return err
 		}
-		return err
 	}
 	highWaterMark, err := h.backend.GetGroupHighWaterMark(g)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 	lowWaterMark, err := h.backend.GetGroupLowWaterMark(g)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 	articlesCount, err := h.backend.GetArticlesCount(g)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 
 	s.currentGroup = &g
 
 	return s.tconn.PrintfLine("211 %d %d %d %s", articlesCount, lowWaterMark, highWaterMark, g.GroupName)
+}
+
+func (h *Handler) handleNewGroups(s *Session, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if len(arguments) < 2 || len(arguments) > 3 {
+		return s.tconn.PrintfLine(protocol.MessageSyntaxError)
+	}
+
+	dateString := arguments[0] + " " + arguments[1]
+	//isGMT := false
+	//if len(arguments) == 3 {
+	//	isGMT = true
+	//}
+
+	var date time.Time
+
+	var err error
+	if len(dateString) == 15 {
+		date, err = time.Parse("20060102 150405", dateString)
+		if err != nil {
+			return err
+		}
+	} else if len(dateString) == 13 {
+		date, err = time.Parse("060102 150405", dateString)
+		if err != nil {
+			return err
+		}
+	} else {
+		return s.tconn.PrintfLine(protocol.MessageSyntaxError)
+	}
+
+	g, err := h.backend.GetNewGroupsSince(date.Unix())
+	if err != nil {
+		return err
+	}
+
+	var sb strings.Builder
+
+	sb.Write([]byte(protocol.MessageListOfNewsgroupsFollows + protocol.CRLF))
+	for _, v := range g {
+		// TODO set actual post permission status
+		c, err := h.backend.GetArticlesCount(v)
+		if err != nil {
+			return err
+		}
+		if c > 0 {
+			highWaterMark, err := h.backend.GetGroupHighWaterMark(v)
+			if err != nil {
+				return err
+			}
+			lowWaterMark, err := h.backend.GetGroupLowWaterMark(v)
+			if err != nil {
+				return err
+			}
+			sb.Write([]byte(fmt.Sprintf("%s %d %d n"+protocol.CRLF, v.GroupName, highWaterMark, lowWaterMark)))
+		} else {
+			sb.Write([]byte(fmt.Sprintf("%s 0 1 n"+protocol.CRLF, v.GroupName)))
+		}
+	}
+	sb.Write([]byte(protocol.MultilineEnding))
+
+	return s.tconn.PrintfLine(sb.String())
 }
 
 func (h *Handler) Handle(s *Session, message string, id uint) error {

@@ -28,7 +28,7 @@
 - :x: `IHAVE`
 - :x: `LAST`
 - :x: `LISTGROUP`
-- :x: `NEWGROUPS`
+- :heavy_check_mark: `NEWGROUPS`
 - :x: `NEWNEWS`
 - :x: `NEXT`
 - :x: `OVER`

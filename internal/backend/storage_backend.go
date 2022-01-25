@@ -10,6 +10,7 @@ type StorageBackend interface {
 	ListGroups() ([]models.Group, error)
 	ListGroupsByPattern(pattern string) ([]models.Group, error)
 	GetGroup(groupName string) (models.Group, error)
+	GetNewGroupsSince(timestamp int64) ([]models.Group, error)
 	GetArticlesCount(g models.Group) (int, error)
 	GetGroupLowWaterMark(g models.Group) (int, error)
 	GetGroupHighWaterMark(g models.Group) (int, error)

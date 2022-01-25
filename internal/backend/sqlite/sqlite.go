@@ -88,3 +88,8 @@ func (sb *SQLiteBackend) GetGroup(groupName string) (models.Group, error) {
 	var group models.Group
 	return group, sb.db.Get(&group, "SELECT * FROM groups WHERE group_name = ?", groupName)
 }
+
+func (sb *SQLiteBackend) GetNewGroupsSince(timestamp int64) ([]models.Group, error) {
+	var groups []models.Group
+	return groups, sb.db.Select(&groups, "SELECT * FROM groups WHERE created_at > ?", timestamp)
+}
