@@ -83,3 +83,8 @@ func (sb *SQLiteBackend) GetGroupLowWaterMark(g models.Group) (int, error) {
 	var waterMark int
 	return waterMark, sb.db.Get(&waterMark, "SELECT article_id FROM articles_to_groups WHERE group_id = ? ORDER BY article_id LIMIT 1", g.ID)
 }
+
+func (sb *SQLiteBackend) GetGroup(groupName string) (models.Group, error) {
+	var group models.Group
+	return group, sb.db.Get(&group, "SELECT * FROM groups WHERE group_name = ?", groupName)
+}

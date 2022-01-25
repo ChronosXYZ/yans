@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/ChronosX88/yans/internal/backend"
 	"github.com/ChronosX88/yans/internal/models"
@@ -23,6 +24,7 @@ func NewHandler(b backend.StorageBackend) *Handler {
 		protocol.CommandQuit:         h.handleQuit,
 		protocol.CommandList:         h.handleList,
 		protocol.CommandMode:         h.handleModeReader,
+		protocol.CommandGroup:        h.handleGroup,
 	}
 	return h
 }
@@ -141,6 +143,39 @@ func (h *Handler) handleModeReader(s *Session, arguments []string, id uint) erro
 	s.mode = SessionModeReader
 
 	return s.tconn.PrintfLine(protocol.MessageReaderModePostingProhibited) // TODO vary on auth status
+}
+
+func (h *Handler) handleGroup(s *Session, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if len(arguments) == 0 || len(arguments) > 1 {
+		return s.tconn.PrintfLine(protocol.MessageSyntaxError)
+	}
+
+	g, err := h.backend.GetGroup(arguments[0])
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return s.tconn.PrintfLine(protocol.MessageNoSuchGroup)
+		}
+		return err
+	}
+	highWaterMark, err := h.backend.GetGroupHighWaterMark(g)
+	if err != nil {
+		return err
+	}
+	lowWaterMark, err := h.backend.GetGroupLowWaterMark(g)
+	if err != nil {
+		return err
+	}
+	articlesCount, err := h.backend.GetArticlesCount(g)
+	if err != nil {
+		return err
+	}
+
+	s.currentGroup = &g
+
+	return s.tconn.PrintfLine("211 %d %d %d %s", articlesCount, lowWaterMark, highWaterMark, g.GroupName)
 }
 
 func (h *Handler) Handle(s *Session, message string, id uint) error {

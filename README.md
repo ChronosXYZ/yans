@@ -21,7 +21,7 @@
 - :heavy_check_mark: `QUIT`
 - :x: `ARTICLE`
 - :x: `BODY`
-- :x: `GROUP`
+- :heavy_check_mark: `GROUP`
 - :x: `HDR`
 - :x: `HEAD`
 - :x: `HELP`

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"github.com/ChronosX88/yans/internal/models"
 	"github.com/ChronosX88/yans/internal/protocol"
 	"io"
 	"log"
@@ -24,6 +25,8 @@ type Session struct {
 	id           string
 	closed       chan<- bool
 	h            *Handler
+
+	currentGroup *models.Group
 	mode         SessionMode
 }
 

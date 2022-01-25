@@ -11,6 +11,7 @@ const (
 	CommandDate         = "DATE"
 	CommandMode         = "MODE"
 	CommandList         = "LIST"
+	CommandGroup        = "GROUP"
 )
 
 const (
@@ -34,4 +35,5 @@ const (
 	MessageErrorHappened                     = "403 Failed to process command:"
 	MessageListOfNewsgroupsFollows           = "215 list of newsgroups follows"
 	MessageSyntaxError                       = "501 Syntax Error"
+	MessageNoSuchGroup                       = "411 No such newsgroup"
 )
