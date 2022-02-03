@@ -143,6 +143,9 @@ func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
 }
 
 func (h *Handler) handleModeReader(s *Session, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
 	if len(arguments) == 0 || arguments[0] != "READER" {
 		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
 	}

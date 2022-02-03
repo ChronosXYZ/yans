@@ -79,12 +79,12 @@ func (sb *SQLiteBackend) GetArticlesCount(g *models.Group) (int, error) {
 
 func (sb *SQLiteBackend) GetGroupHighWaterMark(g *models.Group) (int, error) {
 	var waterMark int
-	return waterMark, sb.db.Get(&waterMark, "SELECT article_id FROM articles_to_groups WHERE group_id = ? ORDER BY article_id DESC LIMIT 1", g.ID)
+	return waterMark, sb.db.Get(&waterMark, "SELECT max(article_number) FROM articles_to_groups WHERE group_id = ?", g.ID)
 }
 
 func (sb *SQLiteBackend) GetGroupLowWaterMark(g *models.Group) (int, error) {
 	var waterMark int
-	return waterMark, sb.db.Get(&waterMark, "SELECT article_id FROM articles_to_groups WHERE group_id = ? ORDER BY article_id LIMIT 1", g.ID)
+	return waterMark, sb.db.Get(&waterMark, "SELECT min(article_number) FROM articles_to_groups WHERE group_id = ?", g.ID)
 }
 
 func (sb *SQLiteBackend) GetGroup(groupName string) (models.Group, error) {
@@ -119,7 +119,7 @@ func (sb *SQLiteBackend) SaveArticle(a models.Article, groups []string) error {
 	}
 
 	for _, v := range groupIDs {
-		_, err = sb.db.Exec("INSERT INTO articles_to_groups (article_id, group_id) VALUES (?, ?)", articleID, v)
+		_, err = sb.db.Exec("INSERT INTO articles_to_groups (article_id, article_number, group_id) VALUES (?, (SELECT ifnull(max(article_number)+1, 1) FROM articles_to_groups), ?)", articleID, v)
 		if err != nil {
 			return err
 		}
@@ -139,21 +139,21 @@ func (sb *SQLiteBackend) GetArticleNumbers(g *models.Group, low, high int64) ([]
 	var numbers []int64
 
 	if high == 0 && low == 0 {
-		if err := sb.db.Select(&numbers, "SELECT article_id FROM articles_to_groups WHERE group_id = ?", g.ID); err != nil {
+		if err := sb.db.Select(&numbers, "SELECT article_number FROM articles_to_groups WHERE group_id = ?", g.ID); err != nil {
 			return nil, err
 		}
 	} else if low == -1 && high != 0 {
-		if err := sb.db.Select(&numbers, "SELECT article_id FROM articles_to_groups WHERE group_id = ? AND article_id = ?", g.ID, high); err != nil {
+		if err := sb.db.Select(&numbers, "SELECT article_number FROM articles_to_groups WHERE group_id = ? AND article_number = ?", g.ID, high); err != nil {
 			return nil, err
 		}
 	} else if low != 0 && high == -1 {
-		if err := sb.db.Select(&numbers, "SELECT article_id FROM articles_to_groups WHERE group_id = ? AND article_id > ?", g.ID, low); err != nil {
+		if err := sb.db.Select(&numbers, "SELECT article_number FROM articles_to_groups WHERE group_id = ? AND article_number > ?", g.ID, low); err != nil {
 			return nil, err
 		}
 	} else if low == -1 && high == -1 {
 		return nil, nil
 	} else {
-		if err := sb.db.Select(&numbers, "SELECT article_id FROM articles_to_groups WHERE group_id = ? AND article_id > ? AND article_id < ?", g.ID, low, high); err != nil {
+		if err := sb.db.Select(&numbers, "SELECT article_number FROM articles_to_groups WHERE group_id = ? AND article_number > ? AND article_number < ?", g.ID, low, high); err != nil {
 			return nil, err
 		}
 	}

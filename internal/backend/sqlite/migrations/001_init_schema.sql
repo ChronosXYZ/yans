@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS articles(
 );
 CREATE TABLE IF NOT EXISTS articles_to_groups(
     article_id INTEGER NOT NULL,
+    article_number INTEGER,
     group_id INTEGER NOT NULL,
     FOREIGN KEY (article_id) REFERENCES articles(id) ON DELETE CASCADE,
     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE
