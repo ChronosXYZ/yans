@@ -11,9 +11,10 @@ type StorageBackend interface {
 	ListGroupsByPattern(pattern string) ([]models.Group, error)
 	GetGroup(groupName string) (models.Group, error)
 	GetNewGroupsSince(timestamp int64) ([]models.Group, error)
-	GetArticlesCount(g models.Group) (int, error)
-	GetGroupLowWaterMark(g models.Group) (int, error)
-	GetGroupHighWaterMark(g models.Group) (int, error)
+	GetArticlesCount(g *models.Group) (int, error)
+	GetGroupLowWaterMark(g *models.Group) (int, error)
+	GetGroupHighWaterMark(g *models.Group) (int, error)
 	SaveArticle(article models.Article, groups []string) error
 	GetArticle(messageID string) (models.Article, error)
+	GetArticleNumbers(g *models.Group, low, high int64) ([]int64, error)
 }

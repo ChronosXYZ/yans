@@ -7,9 +7,11 @@ import (
 	"github.com/ChronosX88/yans/internal/backend"
 	"github.com/ChronosX88/yans/internal/models"
 	"github.com/ChronosX88/yans/internal/protocol"
+	"github.com/ChronosX88/yans/internal/utils"
 	"github.com/google/uuid"
 	"io"
 	"net/mail"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -32,6 +34,7 @@ func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 		protocol.CommandGroup:        h.handleGroup,
 		protocol.CommandNewGroups:    h.handleNewGroups,
 		protocol.CommandPost:         h.handlePost,
+		protocol.CommandListGroup:    h.handleListgroup,
 	}
 	h.serverDomain = serverDomain
 	return h
@@ -85,16 +88,16 @@ func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
 			sb.Write([]byte(protocol.MessageListOfNewsgroupsFollows + protocol.CRLF))
 			for _, v := range groups {
 				// TODO set actual post permission status
-				c, err := h.backend.GetArticlesCount(v)
+				c, err := h.backend.GetArticlesCount(&v)
 				if err != nil {
 					return err
 				}
 				if c > 0 {
-					highWaterMark, err := h.backend.GetGroupHighWaterMark(v)
+					highWaterMark, err := h.backend.GetGroupHighWaterMark(&v)
 					if err != nil {
 						return err
 					}
-					lowWaterMark, err := h.backend.GetGroupLowWaterMark(v)
+					lowWaterMark, err := h.backend.GetGroupLowWaterMark(&v)
 					if err != nil {
 						return err
 					}
@@ -169,15 +172,15 @@ func (h *Handler) handleGroup(s *Session, arguments []string, id uint) error {
 			return err
 		}
 	}
-	highWaterMark, err := h.backend.GetGroupHighWaterMark(g)
+	highWaterMark, err := h.backend.GetGroupHighWaterMark(&g)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
-	lowWaterMark, err := h.backend.GetGroupLowWaterMark(g)
+	lowWaterMark, err := h.backend.GetGroupLowWaterMark(&g)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
-	articlesCount, err := h.backend.GetArticlesCount(g)
+	articlesCount, err := h.backend.GetArticlesCount(&g)
 	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
@@ -230,16 +233,16 @@ func (h *Handler) handleNewGroups(s *Session, arguments []string, id uint) error
 	dw.Write([]byte(protocol.NNTPResponse{Code: 231, Message: "list of new newsgroups follows"}.String() + protocol.CRLF))
 	for _, v := range g {
 		// TODO set actual post permission status
-		c, err := h.backend.GetArticlesCount(v)
+		c, err := h.backend.GetArticlesCount(&v)
 		if err != nil {
 			return err
 		}
 		if c > 0 {
-			highWaterMark, err := h.backend.GetGroupHighWaterMark(v)
+			highWaterMark, err := h.backend.GetGroupHighWaterMark(&v)
 			if err != nil {
 				return err
 			}
-			lowWaterMark, err := h.backend.GetGroupLowWaterMark(v)
+			lowWaterMark, err := h.backend.GetGroupLowWaterMark(&v)
 			if err != nil {
 				return err
 			}
@@ -321,6 +324,66 @@ func (h *Handler) handlePost(s *Session, arguments []string, id uint) error {
 	return s.tconn.PrintfLine(protocol.MessageArticleReceived)
 }
 
+func (h *Handler) handleListgroup(s *Session, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	currentGroup := s.currentGroup
+	var low, high int64
+	if len(arguments) == 1 {
+		g, err := h.backend.GetGroup(arguments[0])
+		if err != nil {
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 411, Message: "No such newsgroup"}.String())
+		}
+		currentGroup = &g
+	} else if len(arguments) == 2 {
+		g, err := h.backend.GetGroup(arguments[0])
+		if err != nil {
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 411, Message: "No such newsgroup"}.String())
+		}
+		currentGroup = &g
+
+		low, high, err = utils.ParseRange(arguments[1])
+		if err != nil {
+			low = 0
+			high = 0
+		}
+		if high != -1 && low > high {
+			low = -1
+			high = -1
+		}
+	}
+
+	if currentGroup == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 412, Message: "No newsgroup selected"}.String())
+	}
+
+	highWaterMark, err := h.backend.GetGroupHighWaterMark(currentGroup)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	lowWaterMark, err := h.backend.GetGroupLowWaterMark(currentGroup)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	articlesCount, err := h.backend.GetArticlesCount(currentGroup)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	nums, err := h.backend.GetArticleNumbers(currentGroup, low, high)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	dw := s.tconn.DotWriter()
+	dw.Write([]byte(protocol.NNTPResponse{Code: 211, Message: fmt.Sprintf("%d %d %d %s list follows%s", articlesCount, lowWaterMark, highWaterMark, currentGroup.GroupName, protocol.CRLF)}.String()))
+	for _, v := range nums {
+		dw.Write([]byte(strconv.FormatInt(v, 10) + protocol.CRLF))
+	}
+	return dw.Close()
+}
+
 func (h *Handler) Handle(s *Session, message string, id uint) error {
 	splittedMessage := strings.Split(message, " ")
 	for i, v := range splittedMessage {
@@ -331,7 +394,7 @@ func (h *Handler) Handle(s *Session, message string, id uint) error {
 	if !ok {
 		s.tconn.StartResponse(id)
 		defer s.tconn.EndResponse(id)
-		return s.tconn.PrintfLine(protocol.MessageUnknownCommand)
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 500, Message: "Unknown command"}.String())
 	}
 	return handler(s, splittedMessage[1:], id)
 }

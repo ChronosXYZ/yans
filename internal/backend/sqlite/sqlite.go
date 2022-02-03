@@ -72,17 +72,17 @@ func (sb *SQLiteBackend) ListGroupsByPattern(pattern string) ([]models.Group, er
 	return groups, sb.db.Select(&groups, "SELECT * FROM groups WHERE group_name REGEXP ?", r.String())
 }
 
-func (sb *SQLiteBackend) GetArticlesCount(g models.Group) (int, error) {
+func (sb *SQLiteBackend) GetArticlesCount(g *models.Group) (int, error) {
 	var count int
 	return count, sb.db.Get(&count, "SELECT COUNT(*) FROM articles_to_groups WHERE group_id = ?", g.ID)
 }
 
-func (sb *SQLiteBackend) GetGroupHighWaterMark(g models.Group) (int, error) {
+func (sb *SQLiteBackend) GetGroupHighWaterMark(g *models.Group) (int, error) {
 	var waterMark int
 	return waterMark, sb.db.Get(&waterMark, "SELECT article_id FROM articles_to_groups WHERE group_id = ? ORDER BY article_id DESC LIMIT 1", g.ID)
 }
 
-func (sb *SQLiteBackend) GetGroupLowWaterMark(g models.Group) (int, error) {
+func (sb *SQLiteBackend) GetGroupLowWaterMark(g *models.Group) (int, error) {
 	var waterMark int
 	return waterMark, sb.db.Get(&waterMark, "SELECT article_id FROM articles_to_groups WHERE group_id = ? ORDER BY article_id LIMIT 1", g.ID)
 }
@@ -133,4 +133,30 @@ func (sb *SQLiteBackend) GetArticle(messageID string) (models.Article, error) {
 		return a, err
 	}
 	return a, json.Unmarshal([]byte(a.HeaderRaw), &a.Header)
+}
+
+func (sb *SQLiteBackend) GetArticleNumbers(g *models.Group, low, high int64) ([]int64, error) {
+	var numbers []int64
+
+	if high == 0 && low == 0 {
+		if err := sb.db.Select(&numbers, "SELECT article_id FROM articles_to_groups WHERE group_id = ?", g.ID); err != nil {
+			return nil, err
+		}
+	} else if low == -1 && high != 0 {
+		if err := sb.db.Select(&numbers, "SELECT article_id FROM articles_to_groups WHERE group_id = ? AND article_id = ?", g.ID, high); err != nil {
+			return nil, err
+		}
+	} else if low != 0 && high == -1 {
+		if err := sb.db.Select(&numbers, "SELECT article_id FROM articles_to_groups WHERE group_id = ? AND article_id > ?", g.ID, low); err != nil {
+			return nil, err
+		}
+	} else if low == -1 && high == -1 {
+		return nil, nil
+	} else {
+		if err := sb.db.Select(&numbers, "SELECT article_id FROM articles_to_groups WHERE group_id = ? AND article_id > ? AND article_id < ?", g.ID, low, high); err != nil {
+			return nil, err
+		}
+	}
+
+	return numbers, nil
 }

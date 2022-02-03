@@ -55,6 +55,7 @@ const (
 	CommandGroup        = "GROUP"
 	CommandNewGroups    = "NEWGROUPS"
 	CommandPost         = "POST"
+	CommandListGroup    = "LISTGROUP"
 )
 
 const (
@@ -74,7 +75,6 @@ const (
 	MessageNNTPServiceReadyPostingProhibited = "201 YANS NNTP Service Ready, posting prohibited"
 	MessageReaderModePostingProhibited       = "201 Reader mode, posting prohibited"
 	MessageNNTPServiceExitsNormally          = "205 NNTP Service exits normally, bye!"
-	MessageUnknownCommand                    = "500 Unknown command"
 	MessageErrorHappened                     = "403 Failed to process command:"
 	MessageListOfNewsgroupsFollows           = "215 list of newsgroups follows"
 	MessageNoSuchGroup                       = "411 No such newsgroup"
