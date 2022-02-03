@@ -1,6 +1,7 @@
 address = "localhost"
 port = 1119
 backend_type = "sqlite"
+domain = "localhost"
 
 [sqlite]
 path = "yans.db"

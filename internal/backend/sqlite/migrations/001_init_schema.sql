@@ -4,15 +4,13 @@ CREATE TABLE IF NOT EXISTS groups(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     group_name TEXT UNIQUE NOT NULL,
     description TEXT,
-    created_at UNSIGNED BIG INT NOT NULL
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS articles(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    date INTEGER NOT NULL,
-    path TEXT,
-    reply_to TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    header TEXT,
     thread TEXT,
-    subject TEXT NOT NULL,
     body TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS articles_to_groups(

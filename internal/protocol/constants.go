@@ -1,5 +1,46 @@
 package protocol
 
+var (
+	ErrSyntaxError = NNTPResponse{Code: 501, Message: "Syntax Error"}
+)
+
+func IsMessageHeaderAllowed(headerName string) bool {
+	switch headerName {
+	case
+		"Date",
+		"From",
+		"Message-ID",
+		"Newsgroups",
+		"Path",
+		"Subject",
+		"Comments",
+		"Keywords",
+		"In-Reply-To",
+		"Sender",
+		"MIME-Version",
+		"Content-Type",
+		"Content-Transfer-Encoding",
+		"Content-Disposition",
+		"Content-Language",
+		"Approved",
+		"Archive",
+		"Control",
+		"Distribution",
+		"Expires",
+		"Followup-To",
+		"Injection-Date",
+		"Injection-Info",
+		"Organization",
+		"References",
+		"Summary",
+		"Supersedes",
+		"User-Agent",
+		"Xref":
+		return true
+	}
+	return false
+}
+
 const (
 	CRLF            = "\r\n"
 	MultilineEnding = "."
@@ -13,6 +54,7 @@ const (
 	CommandList         = "LIST"
 	CommandGroup        = "GROUP"
 	CommandNewGroups    = "NEWGROUPS"
+	CommandPost         = "POST"
 )
 
 const (
@@ -35,7 +77,7 @@ const (
 	MessageUnknownCommand                    = "500 Unknown command"
 	MessageErrorHappened                     = "403 Failed to process command:"
 	MessageListOfNewsgroupsFollows           = "215 list of newsgroups follows"
-	MessageNewGroupsListOfNewsgroupsFollows  = "231 list of new newsgroups follows"
-	MessageSyntaxError                       = "501 Syntax Error"
 	MessageNoSuchGroup                       = "411 No such newsgroup"
+	MessageInputArticle                      = "340 Input article; end with <CR-LF>.<CR-LF>"
+	MessageArticleReceived                   = "240 Article received OK"
 )

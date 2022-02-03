@@ -13,6 +13,7 @@ type Config struct {
 	Address     string              `toml:"address"`
 	Port        int                 `toml:"port"`
 	BackendType string              `toml:"backend_type"`
+	Domain      string              `toml:"domain"`
 	SQLite      SQLiteBackendConfig `toml:"sqlite"`
 }
 

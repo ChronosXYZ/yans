@@ -2,20 +2,25 @@ package server
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"github.com/ChronosX88/yans/internal/backend"
 	"github.com/ChronosX88/yans/internal/models"
 	"github.com/ChronosX88/yans/internal/protocol"
+	"github.com/google/uuid"
+	"io"
+	"net/mail"
 	"strings"
 	"time"
 )
 
 type Handler struct {
-	handlers map[string]func(s *Session, arguments []string, id uint) error
-	backend  backend.StorageBackend
+	handlers     map[string]func(s *Session, arguments []string, id uint) error
+	backend      backend.StorageBackend
+	serverDomain string
 }
 
-func NewHandler(b backend.StorageBackend) *Handler {
+func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 	h := &Handler{}
 	h.backend = b
 	h.handlers = map[string]func(s *Session, arguments []string, id uint) error{
@@ -26,7 +31,9 @@ func NewHandler(b backend.StorageBackend) *Handler {
 		protocol.CommandMode:         h.handleModeReader,
 		protocol.CommandGroup:        h.handleGroup,
 		protocol.CommandNewGroups:    h.handleNewGroups,
+		protocol.CommandPost:         h.handlePost,
 	}
+	h.serverDomain = serverDomain
 	return h
 }
 
@@ -123,7 +130,7 @@ func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
 		}
 	default:
 		{
-			return s.tconn.PrintfLine(protocol.MessageSyntaxError)
+			return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
 		}
 	}
 
@@ -134,7 +141,7 @@ func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
 
 func (h *Handler) handleModeReader(s *Session, arguments []string, id uint) error {
 	if len(arguments) == 0 || arguments[0] != "READER" {
-		return s.tconn.PrintfLine(protocol.MessageSyntaxError)
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
 	}
 
 	(&s.capabilities).Remove(protocol.ModeReaderCapability)
@@ -151,7 +158,7 @@ func (h *Handler) handleGroup(s *Session, arguments []string, id uint) error {
 	defer s.tconn.EndResponse(id)
 
 	if len(arguments) == 0 || len(arguments) > 1 {
-		return s.tconn.PrintfLine(protocol.MessageSyntaxError)
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
 	}
 
 	g, err := h.backend.GetGroup(arguments[0])
@@ -177,7 +184,10 @@ func (h *Handler) handleGroup(s *Session, arguments []string, id uint) error {
 
 	s.currentGroup = &g
 
-	return s.tconn.PrintfLine("211 %d %d %d %s", articlesCount, lowWaterMark, highWaterMark, g.GroupName)
+	return s.tconn.PrintfLine(protocol.NNTPResponse{
+		Code:    211,
+		Message: fmt.Sprintf("%d %d %d %s", articlesCount, lowWaterMark, highWaterMark, g.GroupName),
+	}.String())
 }
 
 func (h *Handler) handleNewGroups(s *Session, arguments []string, id uint) error {
@@ -185,7 +195,7 @@ func (h *Handler) handleNewGroups(s *Session, arguments []string, id uint) error
 	defer s.tconn.EndResponse(id)
 
 	if len(arguments) < 2 || len(arguments) > 3 {
-		return s.tconn.PrintfLine(protocol.MessageSyntaxError)
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
 	}
 
 	dateString := arguments[0] + " " + arguments[1]
@@ -208,7 +218,7 @@ func (h *Handler) handleNewGroups(s *Session, arguments []string, id uint) error
 			return err
 		}
 	} else {
-		return s.tconn.PrintfLine(protocol.MessageSyntaxError)
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
 	}
 
 	g, err := h.backend.GetNewGroupsSince(date.Unix())
@@ -216,9 +226,8 @@ func (h *Handler) handleNewGroups(s *Session, arguments []string, id uint) error
 		return err
 	}
 
-	var sb strings.Builder
-
-	sb.Write([]byte(protocol.MessageListOfNewsgroupsFollows + protocol.CRLF))
+	dw := s.tconn.DotWriter()
+	dw.Write([]byte(protocol.NNTPResponse{Code: 231, Message: "list of new newsgroups follows"}.String() + protocol.CRLF))
 	for _, v := range g {
 		// TODO set actual post permission status
 		c, err := h.backend.GetArticlesCount(v)
@@ -234,14 +243,82 @@ func (h *Handler) handleNewGroups(s *Session, arguments []string, id uint) error
 			if err != nil {
 				return err
 			}
-			sb.Write([]byte(fmt.Sprintf("%s %d %d n"+protocol.CRLF, v.GroupName, highWaterMark, lowWaterMark)))
+			dw.Write([]byte(fmt.Sprintf("%s %d %d n"+protocol.CRLF, v.GroupName, highWaterMark, lowWaterMark)))
 		} else {
-			sb.Write([]byte(fmt.Sprintf("%s 0 1 n"+protocol.CRLF, v.GroupName)))
+			dw.Write([]byte(fmt.Sprintf("%s 0 1 n"+protocol.CRLF, v.GroupName)))
 		}
 	}
-	sb.Write([]byte(protocol.MultilineEnding))
 
-	return s.tconn.PrintfLine(sb.String())
+	return dw.Close()
+}
+
+func (h *Handler) handlePost(s *Session, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if len(arguments) != 0 {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	if err := s.tconn.PrintfLine(protocol.MessageInputArticle); err != nil {
+		return err
+	}
+
+	headers, err := s.tconn.ReadMIMEHeader()
+	if err != nil {
+		return err
+	}
+	if err != nil {
+		return err
+	}
+
+	// generate message id
+	messageID := fmt.Sprintf("<%s@%s>", uuid.New().String(), h.serverDomain)
+	headers["Message-ID"] = []string{messageID}
+
+	headerJson, err := json.Marshal(headers)
+	if err != nil {
+		return err
+	}
+
+	a := models.Article{}
+	a.HeaderRaw = string(headerJson)
+	a.Header = headers
+
+	dr := s.tconn.DotReader()
+	// TODO handle multipart message
+	body, err := io.ReadAll(dr)
+	if err != nil {
+		return err
+	}
+	a.Body = string(body)
+
+	// set thread property
+	if headers.Get("In-Reply-To") != "" {
+		parentMessage, err := h.backend.GetArticle(headers.Get("In-Reply-To"))
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: "no such message you are replying to"}.String())
+			} else {
+				return err
+			}
+		}
+		if !parentMessage.Thread.Valid {
+			var parentHeader mail.Header
+			err = json.Unmarshal([]byte(parentMessage.HeaderRaw), &parentHeader)
+			parentMessageID := parentHeader["Message-ID"]
+			a.Thread = sql.NullString{String: parentMessageID[0], Valid: true}
+		} else {
+			a.Thread = parentMessage.Thread
+		}
+	}
+
+	err = h.backend.SaveArticle(a, strings.Split(a.Header.Get("Newsgroups"), ","))
+	if err != nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: err.Error()}.String())
+	}
+
+	return s.tconn.PrintfLine(protocol.MessageArticleReceived)
 }
 
 func (h *Handler) Handle(s *Session, message string, id uint) error {

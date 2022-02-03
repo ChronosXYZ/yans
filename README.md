@@ -32,7 +32,7 @@
 - :x: `NEWNEWS`
 - :x: `NEXT`
 - :x: `OVER`
-- :x: `POST`
+- :construction: `POST`
 - :x: `STAT`
 
 ## License
