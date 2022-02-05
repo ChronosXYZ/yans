@@ -23,11 +23,11 @@
 - :construction: Article posting
   - :construction: `POST`
   - :x: `IHAVE`
-- :construction: Article retrieving
+- :heavy_check_mark: Article retrieving
   - :heavy_check_mark: `ARTICLE`
   - :heavy_check_mark: `HEAD`
   - :heavy_check_mark: `BODY`
-  - :x: `STAT`
+  - :heavy_check_mark: `STAT`
 - :x: Articles overview
   - :x: `OVER`
   - :x: `LIST OVERVIEW.FMT`

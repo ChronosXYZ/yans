@@ -59,6 +59,7 @@ const (
 	CommandArticle      = "ARTICLE"
 	CommandHead         = "HEAD"
 	CommandBody         = "BODY"
+	CommandStat         = "STAT"
 )
 
 const (

@@ -18,7 +18,7 @@ import (
 )
 
 type Handler struct {
-	handlers     map[string]func(s *Session, arguments []string, id uint) error
+	handlers     map[string]func(s *Session, command string, arguments []string, id uint) error
 	backend      backend.StorageBackend
 	serverDomain string
 }
@@ -26,7 +26,7 @@ type Handler struct {
 func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 	h := &Handler{}
 	h.backend = b
-	h.handlers = map[string]func(s *Session, arguments []string, id uint) error{
+	h.handlers = map[string]func(s *Session, command string, arguments []string, id uint) error{
 		protocol.CommandCapabilities: h.handleCapabilities,
 		protocol.CommandDate:         h.handleDate,
 		protocol.CommandQuit:         h.handleQuit,
@@ -37,32 +37,33 @@ func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 		protocol.CommandPost:         h.handlePost,
 		protocol.CommandListGroup:    h.handleListgroup,
 		protocol.CommandArticle:      h.handleArticle,
-		protocol.CommandHead:         h.handleHead,
-		protocol.CommandBody:         h.handleBody,
+		protocol.CommandHead:         h.handleArticle,
+		protocol.CommandBody:         h.handleArticle,
+		protocol.CommandStat:         h.handleArticle,
 	}
 	h.serverDomain = serverDomain
 	return h
 }
 
-func (h *Handler) handleCapabilities(s *Session, arguments []string, id uint) error {
+func (h *Handler) handleCapabilities(s *Session, command string, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
 	return s.tconn.PrintfLine(s.capabilities.String())
 }
 
-func (h *Handler) handleDate(s *Session, arguments []string, id uint) error {
+func (h *Handler) handleDate(s *Session, command string, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
 	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 111, Message: time.Now().UTC().Format("20060102150405")}.String())
 }
 
-func (h *Handler) handleQuit(s *Session, arguments []string, id uint) error {
+func (h *Handler) handleQuit(s *Session, command string, arguments []string, id uint) error {
 	s.tconn.PrintfLine(protocol.NNTPResponse{Code: 205, Message: "NNTP Service exits normally, bye!"}.String())
 	s.conn.Close()
 	return nil
 }
 
-func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
+func (h *Handler) handleList(s *Session, command string, arguments []string, id uint) error {
 	sb := strings.Builder{}
 
 	listType := ""
@@ -146,7 +147,7 @@ func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
 	return s.tconn.PrintfLine(sb.String())
 }
 
-func (h *Handler) handleModeReader(s *Session, arguments []string, id uint) error {
+func (h *Handler) handleModeReader(s *Session, command string, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
 
@@ -163,7 +164,7 @@ func (h *Handler) handleModeReader(s *Session, arguments []string, id uint) erro
 	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 201, Message: "Reader mode, posting prohibited"}.String()) // TODO vary on auth status
 }
 
-func (h *Handler) handleGroup(s *Session, arguments []string, id uint) error {
+func (h *Handler) handleGroup(s *Session, command string, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
 
@@ -200,7 +201,7 @@ func (h *Handler) handleGroup(s *Session, arguments []string, id uint) error {
 	}.String())
 }
 
-func (h *Handler) handleNewGroups(s *Session, arguments []string, id uint) error {
+func (h *Handler) handleNewGroups(s *Session, command string, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
 
@@ -262,7 +263,7 @@ func (h *Handler) handleNewGroups(s *Session, arguments []string, id uint) error
 	return dw.Close()
 }
 
-func (h *Handler) handlePost(s *Session, arguments []string, id uint) error {
+func (h *Handler) handlePost(s *Session, command string, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
 
@@ -328,7 +329,7 @@ func (h *Handler) handlePost(s *Session, arguments []string, id uint) error {
 	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 240, Message: "Article received OK"}.String())
 }
 
-func (h *Handler) handleListgroup(s *Session, arguments []string, id uint) error {
+func (h *Handler) handleListgroup(s *Session, command string, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
 
@@ -388,7 +389,7 @@ func (h *Handler) handleListgroup(s *Session, arguments []string, id uint) error
 	return dw.Close()
 }
 
-func (h *Handler) handleArticle(s *Session, arguments []string, id uint) error {
+func (h *Handler) handleArticle(s *Session, command string, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
 
@@ -434,161 +435,81 @@ func (h *Handler) handleArticle(s *Session, arguments []string, id uint) error {
 
 	s.currentArticle = &a
 
-	err = json.Unmarshal([]byte(a.HeaderRaw), &a.Header)
-	if err != nil {
-		return err
-	}
+	switch command {
+	case protocol.CommandArticle:
+		{
+			m := utils.NewMessage()
+			for k, v := range a.Header {
+				m.SetHeader(k, v...)
+			}
 
-	m := utils.NewMessage()
-	for k, v := range a.Header {
-		m.SetHeader(k, v...)
-	}
-
-	m.SetBody("text/plain", a.Body) // FIXME currently only plain text is supported
-	dw := s.tconn.DotWriter()
-	_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 220, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
-	if err != nil {
-		return err
-	}
-	_, err = m.WriteTo(dw)
-	if err != nil {
-		return err
-	}
-
-	return dw.Close()
-}
-
-// FIXME refactor this, because it's mostly duplicate of ARTICLE handler function
-func (h *Handler) handleHead(s *Session, arguments []string, id uint) error {
-	s.tconn.StartResponse(id)
-	defer s.tconn.EndResponse(id)
-
-	if len(arguments) == 0 && s.currentArticle == nil {
-		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 420, Message: "No current article selected"}.String())
-	}
-
-	if len(arguments) > 1 {
-		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
-	}
-
-	getByArticleNum := true
-	num, err := strconv.Atoi(arguments[0])
-	if err != nil {
-		getByArticleNum = false
-	}
-
-	if getByArticleNum && s.currentGroup == nil {
-		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 412, Message: "No newsgroup selected"}.String())
-	}
-
-	var a models.Article
-
-	if getByArticleNum {
-		a, err = h.backend.GetArticleByNumber(s.currentGroup, num)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 423, Message: "No article with that number"}.String())
-			} else {
+			m.SetBody("text/plain", a.Body) // FIXME currently only plain text is supported
+			dw := s.tconn.DotWriter()
+			_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 220, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
+			if err != nil {
 				return err
 			}
+			_, err = m.WriteTo(dw)
+			if err != nil {
+				return err
+			}
+
+			return dw.Close()
 		}
-	} else {
-		a, err = h.backend.GetArticle(arguments[0])
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 430, Message: "No Such Article Found"}.String())
-			} else {
+	case protocol.CommandHead:
+		{
+			m := utils.NewMessage()
+			for k, v := range a.Header {
+				m.SetHeader(k, v...)
+			}
+
+			dw := s.tconn.DotWriter()
+			_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 221, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
+			if err != nil {
 				return err
 			}
+			_, err = m.WriteTo(dw)
+			if err != nil {
+				return err
+			}
+
+			return dw.Close()
 		}
-	}
+	case protocol.CommandBody:
+		{
+			m := utils.NewMessage()
+			for k, v := range a.Header {
+				m.SetHeader(k, v...)
+			}
 
-	s.currentArticle = &a
+			m.SetBody("text/plain", a.Body) // FIXME currently only plain text is supported
+			dw := s.tconn.DotWriter()
 
-	m := utils.NewMessage()
-	for k, v := range a.Header {
-		m.SetHeader(k, v...)
-	}
-
-	dw := s.tconn.DotWriter()
-	_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 221, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
-	if err != nil {
-		return err
-	}
-	_, err = m.WriteTo(dw)
-	if err != nil {
-		return err
-	}
-
-	return dw.Close()
-}
-
-// FIXME refactor this, because it's mostly duplicate of ARTICLE handler function
-func (h *Handler) handleBody(s *Session, arguments []string, id uint) error {
-	s.tconn.StartResponse(id)
-	defer s.tconn.EndResponse(id)
-
-	if len(arguments) == 0 && s.currentArticle == nil {
-		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 420, Message: "No current article selected"}.String())
-	}
-
-	if len(arguments) > 1 {
-		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
-	}
-
-	getByArticleNum := true
-	num, err := strconv.Atoi(arguments[0])
-	if err != nil {
-		getByArticleNum = false
-	}
-
-	if getByArticleNum && s.currentGroup == nil {
-		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 412, Message: "No newsgroup selected"}.String())
-	}
-
-	var a models.Article
-
-	if getByArticleNum {
-		a, err = h.backend.GetArticleByNumber(s.currentGroup, num)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 423, Message: "No article with that number"}.String())
-			} else {
+			_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 222, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
+			if err != nil {
 				return err
 			}
+
+			w := bufio.NewWriter(dw)
+			_, err = w.Write([]byte(a.Body))
+			if err != nil {
+				return err
+			}
+
+			err = w.Flush()
+			if err != nil {
+				return err
+			}
+
+			return dw.Close()
 		}
-	} else {
-		a, err = h.backend.GetArticle(arguments[0])
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 430, Message: "No Such Article Found"}.String())
-			} else {
-				return err
-			}
+	case protocol.CommandStat:
+		{
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 223, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String())
 		}
 	}
 
-	s.currentArticle = &a
-
-	dw := s.tconn.DotWriter()
-	
-	_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 222, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
-	if err != nil {
-		return err
-	}
-
-	w := bufio.NewWriter(dw)
-	_, err = w.Write([]byte(a.Body))
-	if err != nil {
-		return err
-	}
-
-	err = w.Flush()
-	if err != nil {
-		return err
-	}
-
-	return dw.Close()
+	return nil
 }
 
 func (h *Handler) Handle(s *Session, message string, id uint) error {
@@ -603,5 +524,5 @@ func (h *Handler) Handle(s *Session, message string, id uint) error {
 		defer s.tconn.EndResponse(id)
 		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 500, Message: "Unknown command"}.String())
 	}
-	return handler(s, splittedMessage[1:], id)
+	return handler(s, cmdName, splittedMessage[1:], id)
 }
