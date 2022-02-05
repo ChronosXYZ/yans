@@ -297,6 +297,9 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 	messageID := fmt.Sprintf("<%s@%s>", uuid.New().String(), h.serverDomain)
 	headers.Set("Message-ID", messageID)
 
+	// set path header
+	headers.Set("Path", fmt.Sprintf("%s!not-for-mail", h.serverDomain))
+
 	headerJson, err := json.Marshal(headers)
 	if err != nil {
 		return err
