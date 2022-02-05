@@ -337,8 +337,8 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 		if !parentMessage.Thread.Valid {
 			var parentHeader mail.Header
 			err = json.Unmarshal([]byte(parentMessage.HeaderRaw), &parentHeader)
-			parentMessageID := parentHeader["Message-ID"]
-			a.Thread = sql.NullString{String: parentMessageID[0], Valid: true}
+			parentMessageID := parentHeader.Get("Message-ID")
+			a.Thread = sql.NullString{String: parentMessageID, Valid: true}
 		} else {
 			a.Thread = parentMessage.Thread
 		}
