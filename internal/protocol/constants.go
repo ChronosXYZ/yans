@@ -56,6 +56,7 @@ const (
 	CommandNewGroups    = "NEWGROUPS"
 	CommandPost         = "POST"
 	CommandListGroup    = "LISTGROUP"
+	CommandArticle      = "ARTICLE"
 )
 
 const (

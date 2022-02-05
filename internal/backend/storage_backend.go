@@ -16,5 +16,6 @@ type StorageBackend interface {
 	GetGroupHighWaterMark(g *models.Group) (int, error)
 	SaveArticle(article models.Article, groups []string) error
 	GetArticle(messageID string) (models.Article, error)
+	GetArticleByNumber(g *models.Group, num int) (models.Article, error)
 	GetArticleNumbers(g *models.Group, low, high int64) ([]int64, error)
 }

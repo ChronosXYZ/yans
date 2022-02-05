@@ -35,6 +35,7 @@ func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 		protocol.CommandNewGroups:    h.handleNewGroups,
 		protocol.CommandPost:         h.handlePost,
 		protocol.CommandListGroup:    h.handleListgroup,
+		protocol.CommandArticle:      h.handleArticle,
 	}
 	h.serverDomain = serverDomain
 	return h
@@ -274,13 +275,10 @@ func (h *Handler) handlePost(s *Session, arguments []string, id uint) error {
 	if err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
 
 	// generate message id
 	messageID := fmt.Sprintf("<%s@%s>", uuid.New().String(), h.serverDomain)
-	headers["Message-ID"] = []string{messageID}
+	headers.Set("Message-ID", messageID)
 
 	headerJson, err := json.Marshal(headers)
 	if err != nil {
@@ -384,6 +382,76 @@ func (h *Handler) handleListgroup(s *Session, arguments []string, id uint) error
 	for _, v := range nums {
 		dw.Write([]byte(strconv.FormatInt(v, 10) + protocol.CRLF))
 	}
+	return dw.Close()
+}
+
+func (h *Handler) handleArticle(s *Session, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if len(arguments) == 0 && s.currentArticle == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 420, Message: "No current article selected"}.String())
+	}
+
+	if len(arguments) > 1 {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	getByArticleNum := true
+	num, err := strconv.Atoi(arguments[0])
+	if err != nil {
+		getByArticleNum = false
+	}
+
+	if getByArticleNum && s.currentGroup == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 412, Message: "No newsgroup selected"}.String())
+	}
+
+	var a models.Article
+
+	if getByArticleNum {
+		a, err = h.backend.GetArticleByNumber(s.currentGroup, num)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 423, Message: "No article with that number"}.String())
+			} else {
+				return err
+			}
+		}
+	} else {
+		a, err = h.backend.GetArticle(arguments[0])
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 430, Message: "No Such Article Found"}.String())
+			} else {
+				return err
+			}
+		}
+	}
+
+	s.currentArticle = &a
+
+	err = json.Unmarshal([]byte(a.HeaderRaw), &a.Header)
+	if err != nil {
+		return err
+	}
+
+	m := utils.NewMessage()
+	for k, v := range a.Header {
+		m.SetHeader(k, v...)
+	}
+
+	m.SetBody("text/plain", a.Body) // FIXME currently only plain text is supported
+	dw := s.tconn.DotWriter()
+	_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 220, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
+	if err != nil {
+		return err
+	}
+	_, err = m.WriteTo(dw)
+	if err != nil {
+		return err
+	}
+
 	return dw.Close()
 }
 

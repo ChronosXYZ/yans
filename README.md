@@ -20,7 +20,7 @@
 - :heavy_check_mark: `LIST NEWSGROUPS`
 - :heavy_check_mark: `MODE READER`
 - :heavy_check_mark: `QUIT`
-- :x: `ARTICLE`
+- :heavy_check_mark: `ARTICLE`
 - :x: `BODY`
 - :heavy_check_mark: `GROUP`
 - :x: `HDR`

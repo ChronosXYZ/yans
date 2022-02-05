@@ -27,8 +27,9 @@ type Session struct {
 	closed       chan<- bool
 	h            *Handler
 
-	currentGroup *models.Group
-	mode         SessionMode
+	currentGroup   *models.Group
+	currentArticle *models.Article
+	mode           SessionMode
 }
 
 func NewSession(ctx context.Context, conn net.Conn, caps protocol.Capabilities, id string, closed chan<- bool, handler *Handler) (*Session, error) {
