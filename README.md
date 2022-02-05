@@ -9,7 +9,8 @@
 - :heavy_check_mark: Wildmat support
 - :heavy_check_mark: Database (SQLite)
 - :heavy_check_mark: Basic article posting
-- :construction: Multipart articles support
+- :construction: Article retrieving
+- :construction: Multipart article support
 - :x: Transit mode
 - :x: Authentication
 
