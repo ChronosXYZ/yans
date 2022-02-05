@@ -41,8 +41,8 @@
 - :construction: The LIST Commands
   - :heavy_check_mark: `LIST ACTIVE`
   - :heavy_check_mark: `LIST NEWSGROUPS`
-  - :x: LIST ACTIVE.TIMES
-  - :x: LIST DISTRIB.PATS
+  - :x: `LIST ACTIVE.TIMES`
+  - :x: `LIST DISTRIB.PATS`
 - :construction: Information Commands
   - :heavy_check_mark: `DATE`
   - :x: `HELP`
