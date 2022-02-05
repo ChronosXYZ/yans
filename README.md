@@ -25,7 +25,7 @@
   - :x: `IHAVE`
 - :construction: Article retrieving
   - :heavy_check_mark: `ARTICLE`
-  - :x: `HEAD`
+  - :heavy_check_mark: `HEAD`
   - :x: `BODY`
   - :x: `STAT`
 - :x: Articles overview
