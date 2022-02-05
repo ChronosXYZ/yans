@@ -195,6 +195,24 @@ func (sb *SQLiteBackend) GetNextArticleByNum(g *models.Group, a *models.Article)
 	return nextArticle, json.Unmarshal([]byte(nextArticle.HeaderRaw), &nextArticle.Header)
 }
 
+func (sb *SQLiteBackend) GetArticlesByRange(g *models.Group, low, high int64) ([]models.Article, error) {
+	var articles []models.Article
+
+	if err := sb.db.Select(&articles, "SELECT articles.* FROM articles INNER JOIN articles_to_groups atg on atg.article_id = articles.id WHERE atg.article_number >= ? AND atg.article_number <= ? AND atg.group_id = ? ORDER BY atg.article_number", low, high, g.ID); err != nil {
+		return nil, err
+	}
+	for i := 0; i < len(articles); i++ {
+		if err := sb.db.Get(&articles[i].ArticleNumber, "SELECT article_number FROM articles_to_groups WHERE article_id = ?", articles[i].ID); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(articles[i].HeaderRaw), &articles[i].Header); err != nil {
+			return nil, err
+		}
+	}
+
+	return articles, nil
+}
+
 func (sb *SQLiteBackend) GetNewArticlesSince(timestamp int64) ([]string, error) {
 	var articleIds []string
 	return articleIds, sb.db.Select(&articleIds, "SELECT json_extract(articles.header, '$.Message-Id[0]') FROM articles WHERE created_at > datetime(?, 'unixepoch')", timestamp)

@@ -44,6 +44,8 @@ func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 		protocol.CommandNewNews:      h.handleNewNews,
 		protocol.CommandLast:         h.handleLast,
 		protocol.CommandNext:         h.handleNext,
+		protocol.CommandOver:         h.handleOver,
+		protocol.CommandXover:        h.handleOver,
 	}
 	h.serverDomain = serverDomain
 	return h
@@ -299,6 +301,11 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 
 	// set path header
 	headers.Set("Path", fmt.Sprintf("%s!not-for-mail", h.serverDomain))
+
+	// set date header
+	if headers.Get("Date") == "" {
+		headers.Set("Date", time.Now().UTC().Format(time.RFC1123Z))
+	}
 
 	headerJson, err := json.Marshal(headers)
 	if err != nil {
@@ -705,6 +712,99 @@ func (h *Handler) handleNext(s *Session, command string, arguments []string, id 
 	s.currentArticle = &a
 
 	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 223, Message: fmt.Sprintf("%d %s retrieved", a.ArticleNumber, a.Header.Get("Message-Id"))}.String())
+}
+
+func (h *Handler) handleOver(s *Session, command string, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if len(arguments) == 0 && s.currentArticle == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 420, Message: "No current article selected"}.String())
+	}
+
+	byRange := false
+	byNum := false
+	byMsgID := false
+	curArticle := false
+
+	if len(arguments) == 1 {
+		if _, _, err := utils.ParseRange(arguments[0]); err == nil {
+			byRange = true
+		} else if strings.ContainsAny(arguments[0], "<>") {
+			byMsgID = true
+		} else if _, err := strconv.Atoi(arguments[0]); err == nil {
+			byNum = true
+		}
+	} else if len(arguments) == 0 {
+		curArticle = true
+	} else {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	var articles []models.Article
+
+	if byRange {
+		if s.currentGroup == nil {
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 412, Message: "No newsgroup selected"}.String())
+		}
+
+		low, high, err := utils.ParseRange(arguments[0])
+		if err != nil {
+			return err
+		}
+		if low > high {
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 423, Message: "Empty range"}.String())
+		}
+		a, err := h.backend.GetArticlesByRange(s.currentGroup, low, high)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 423, Message: "No articles in that range"}.String())
+			}
+			return err
+		}
+		articles = append(articles, a...)
+	} else if byMsgID {
+		a, err := h.backend.GetArticle(arguments[0])
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 430, Message: "No such article with that message-id"}.String())
+			}
+			return err
+		}
+		a.ArticleNumber = 0
+		articles = append(articles, a)
+	} else if byNum {
+		num, _ := strconv.Atoi(arguments[0])
+		a, err := h.backend.GetArticleByNumber(s.currentGroup, num)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 423, Message: "No such article in this group"}.String())
+			}
+			return err
+		}
+		articles = append(articles, a)
+	} else if curArticle {
+		articles = append(articles, *s.currentArticle)
+	}
+
+	dw := s.tconn.DotWriter()
+	dw.Write([]byte(protocol.NNTPResponse{Code: 224, Message: "Overview information follows" + protocol.CRLF}.String()))
+	for _, v := range articles {
+		dw.Write([]byte(strconv.Itoa(v.ArticleNumber) + "	"))
+		dw.Write([]byte(v.Header.Get("Subject") + "	"))
+		dw.Write([]byte(v.Header.Get("From") + "	"))
+		dw.Write([]byte(v.Header.Get("Date") + "	"))
+		dw.Write([]byte(v.Header.Get("Message-ID") + "	"))
+		dw.Write([]byte(v.Header.Get("References") + "	"))
+
+		bytesMetadata := len([]byte(v.Body))
+		linesMetadata := strings.Count(v.Body, "\n")
+
+		dw.Write([]byte(strconv.Itoa(bytesMetadata) + "	"))
+		dw.Write([]byte(strconv.Itoa(linesMetadata) + protocol.CRLF))
+	}
+
+	return dw.Close()
 }
 
 func (h *Handler) Handle(s *Session, message string, id uint) error {

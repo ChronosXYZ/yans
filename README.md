@@ -28,8 +28,8 @@
   - :heavy_check_mark: `HEAD`
   - :heavy_check_mark: `BODY`
   - :heavy_check_mark: `STAT`
-- :x: Articles overview
-  - :x: `OVER`
+- :construction: Articles overview
+  - :heavy_check_mark: `OVER`
   - :x: `LIST OVERVIEW.FMT`
   - :x: `HDR`
   - :x: `LIST HEADERS`

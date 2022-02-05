@@ -64,6 +64,8 @@ const (
 	CommandNewNews      = "NEWNEWS"
 	CommandLast         = "LAST"
 	CommandNext         = "NEXT"
+	CommandOver         = "OVER"
+	CommandXover        = "XOVER"
 )
 
 const (

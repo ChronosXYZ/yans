@@ -21,4 +21,5 @@ type StorageBackend interface {
 	GetNewArticlesSince(timestamp int64) ([]string, error)
 	GetLastArticleByNum(g *models.Group, a *models.Article) (models.Article, error)
 	GetNextArticleByNum(g *models.Group, a *models.Article) (models.Article, error)
+	GetArticlesByRange(g *models.Group, low, high int64) ([]models.Article, error)
 }
