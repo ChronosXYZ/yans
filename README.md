@@ -26,7 +26,7 @@
 - :construction: Article retrieving
   - :heavy_check_mark: `ARTICLE`
   - :heavy_check_mark: `HEAD`
-  - :x: `BODY`
+  - :heavy_check_mark: `BODY`
   - :x: `STAT`
 - :x: Articles overview
   - :x: `OVER`

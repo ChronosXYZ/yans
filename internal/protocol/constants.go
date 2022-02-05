@@ -58,6 +58,7 @@ const (
 	CommandListGroup    = "LISTGROUP"
 	CommandArticle      = "ARTICLE"
 	CommandHead         = "HEAD"
+	CommandBody         = "BODY"
 )
 
 const (

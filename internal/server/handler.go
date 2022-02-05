@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -37,6 +38,7 @@ func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 		protocol.CommandListGroup:    h.handleListgroup,
 		protocol.CommandArticle:      h.handleArticle,
 		protocol.CommandHead:         h.handleHead,
+		protocol.CommandBody:         h.handleBody,
 	}
 	h.serverDomain = serverDomain
 	return h
@@ -386,7 +388,6 @@ func (h *Handler) handleListgroup(s *Session, arguments []string, id uint) error
 	return dw.Close()
 }
 
-// TODO refactor this, because it's mostly duplicate of ARTICLE handler function
 func (h *Handler) handleArticle(s *Session, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
@@ -457,6 +458,7 @@ func (h *Handler) handleArticle(s *Session, arguments []string, id uint) error {
 	return dw.Close()
 }
 
+// FIXME refactor this, because it's mostly duplicate of ARTICLE handler function
 func (h *Handler) handleHead(s *Session, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
@@ -514,6 +516,74 @@ func (h *Handler) handleHead(s *Session, arguments []string, id uint) error {
 		return err
 	}
 	_, err = m.WriteTo(dw)
+	if err != nil {
+		return err
+	}
+
+	return dw.Close()
+}
+
+// FIXME refactor this, because it's mostly duplicate of ARTICLE handler function
+func (h *Handler) handleBody(s *Session, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if len(arguments) == 0 && s.currentArticle == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 420, Message: "No current article selected"}.String())
+	}
+
+	if len(arguments) > 1 {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	getByArticleNum := true
+	num, err := strconv.Atoi(arguments[0])
+	if err != nil {
+		getByArticleNum = false
+	}
+
+	if getByArticleNum && s.currentGroup == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 412, Message: "No newsgroup selected"}.String())
+	}
+
+	var a models.Article
+
+	if getByArticleNum {
+		a, err = h.backend.GetArticleByNumber(s.currentGroup, num)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 423, Message: "No article with that number"}.String())
+			} else {
+				return err
+			}
+		}
+	} else {
+		a, err = h.backend.GetArticle(arguments[0])
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 430, Message: "No Such Article Found"}.String())
+			} else {
+				return err
+			}
+		}
+	}
+
+	s.currentArticle = &a
+
+	dw := s.tconn.DotWriter()
+	
+	_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 222, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
+	if err != nil {
+		return err
+	}
+
+	w := bufio.NewWriter(dw)
+	_, err = w.Write([]byte(a.Body))
+	if err != nil {
+		return err
+	}
+
+	err = w.Flush()
 	if err != nil {
 		return err
 	}
