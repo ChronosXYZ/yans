@@ -33,11 +33,11 @@
   - :x: `LIST OVERVIEW.FMT`
   - :x: `HDR`
   - :x: `LIST HEADERS`
-- :construction: Group and Article Selection
+- :heavy_check_mark: Group and Article Selection
   - :heavy_check_mark: `GROUP`
   - :heavy_check_mark: `LISTGROUP`
   - :heavy_check_mark: `LAST`
-  - :x: `NEXT`
+  - :heavy_check_mark: `NEXT`
 - :construction: The LIST Commands
   - :heavy_check_mark: `LIST ACTIVE`
   - :heavy_check_mark: `LIST NEWSGROUPS`

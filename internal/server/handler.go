@@ -43,6 +43,7 @@ func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 		protocol.CommandHelp:         h.handleHelp,
 		protocol.CommandNewNews:      h.handleNewNews,
 		protocol.CommandLast:         h.handleLast,
+		protocol.CommandNext:         h.handleNext,
 	}
 	h.serverDomain = serverDomain
 	return h
@@ -656,6 +657,42 @@ func (h *Handler) handleLast(s *Session, command string, arguments []string, id 
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 422, Message: "No previous article to retrieve"}.String())
+		}
+		return err
+	}
+
+	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 223, Message: fmt.Sprintf("%d %s retrieved", a.ArticleNumber, a.Header.Get("Message-ID"))}.String())
+}
+
+func (h *Handler) handleNext(s *Session, command string, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if len(arguments) != 0 {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	if s.currentGroup == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 412, Message: "no newsgroup selected"}.String())
+	}
+
+	if s.currentArticle == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 420, Message: "No current article selected"}.String())
+	}
+
+	high, err := h.backend.GetGroupHighWaterMark(s.currentGroup)
+	if err != nil {
+		return err
+	}
+
+	if s.currentArticle.ArticleNumber == high {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 421, Message: "No next article to retrieve"}.String())
+	}
+
+	a, err := h.backend.GetNextArticleByNum(s.currentGroup, s.currentArticle)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 421, Message: "No next article to retrieve"}.String())
 		}
 		return err
 	}
