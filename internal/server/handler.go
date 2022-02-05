@@ -40,6 +40,7 @@ func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 		protocol.CommandHead:         h.handleArticle,
 		protocol.CommandBody:         h.handleArticle,
 		protocol.CommandStat:         h.handleArticle,
+		protocol.CommandHelp:         h.handleHelp,
 	}
 	h.serverDomain = serverDomain
 	return h
@@ -510,6 +511,49 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 	}
 
 	return nil
+}
+
+func (h *Handler) handleHelp(s *Session, command string, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	help :=
+		"  ARTICLE [message-ID|number]\r\n" +
+			"  BODY [message-ID|number]\r\n" +
+			"  CAPABILITIES [keyword]\r\n" +
+			"  DATE\r\n" +
+			"  GROUP newsgroup\r\n" +
+			"  HEAD [message-ID|number]\r\n" +
+			"  HELP\r\n" +
+			"  LAST\r\n" +
+			"  LIST [ACTIVE [wildmat]|NEWSGROUPS [wildmat]]\r\n" +
+			"  LISTGROUP [newsgroup [range]]\r\n" +
+			"  MODE READER\r\n" +
+			"  NEWGROUPS [yy]yymmdd hhmmss [GMT]\r\n" +
+			"  NEXT\r\n" +
+			"  POST\r\n" +
+			"  QUIT\r\n" +
+			"  STAT [message-ID|number]\r\n"
+
+	dw := s.tconn.DotWriter()
+	w := bufio.NewWriter(dw)
+
+	_, err := w.Write([]byte(protocol.NNTPResponse{Code: 100, Message: "Legal commands"}.String() + protocol.CRLF))
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write([]byte(help))
+	if err != nil {
+		return err
+	}
+
+	err = w.Flush()
+	if err != nil {
+		return err
+	}
+
+	return dw.Close()
 }
 
 func (h *Handler) Handle(s *Session, message string, id uint) error {

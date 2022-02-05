@@ -45,7 +45,7 @@
   - :x: `LIST DISTRIB.PATS`
 - :construction: Information Commands
   - :heavy_check_mark: `DATE`
-  - :x: `HELP`
+  - :heavy_check_mark: `HELP`
   - :heavy_check_mark: `NEWGROUPS`
   - :x: `NEWNEWS`
 

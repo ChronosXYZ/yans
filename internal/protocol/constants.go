@@ -60,6 +60,7 @@ const (
 	CommandHead         = "HEAD"
 	CommandBody         = "BODY"
 	CommandStat         = "STAT"
+	CommandHelp         = "HELP"
 )
 
 const (
