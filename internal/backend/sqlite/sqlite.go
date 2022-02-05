@@ -132,6 +132,9 @@ func (sb *SQLiteBackend) GetArticle(messageID string) (models.Article, error) {
 	if err := sb.db.Get(&a, "SELECT * FROM articles WHERE json_extract(articles.header, '$.Message-Id[0]') = ?", messageID); err != nil {
 		return a, err
 	}
+	if err := sb.db.Get(&a.ArticleNumber, "SELECT article_number FROM articles_to_groups WHERE article_id = ?", a.ID); err != nil {
+		return a, err
+	}
 	return a, json.Unmarshal([]byte(a.HeaderRaw), &a.Header)
 }
 
@@ -140,6 +143,7 @@ func (sb *SQLiteBackend) GetArticleByNumber(g *models.Group, num int) (models.Ar
 	if err := sb.db.Get(&a, "SELECT articles.* FROM articles INNER JOIN articles_to_groups atg on atg.article_id = articles.id WHERE atg.article_number = ? AND atg.group_id = ?", num, g.ID); err != nil {
 		return a, err
 	}
+	a.ArticleNumber = num
 	return a, json.Unmarshal([]byte(a.HeaderRaw), &a.Header)
 }
 

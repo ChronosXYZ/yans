@@ -197,6 +197,15 @@ func (h *Handler) handleGroup(s *Session, command string, arguments []string, id
 
 	s.currentGroup = &g
 
+	if lowWaterMark != 0 {
+		a, err := h.backend.GetArticleByNumber(&g, lowWaterMark)
+		if err != nil {
+			return err
+		}
+
+		s.currentArticle = &a
+	}
+
 	return s.tconn.PrintfLine(protocol.NNTPResponse{
 		Code:    211,
 		Message: fmt.Sprintf("%d %d %d %s", articlesCount, lowWaterMark, highWaterMark, g.GroupName),
@@ -395,28 +404,35 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
 
-	if len(arguments) == 0 && s.currentArticle == nil {
-		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 420, Message: "No current article selected"}.String())
+	var err error
+	getByArticleNum := true
+	if len(arguments) == 0 {
+		if s.currentArticle == nil {
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 420, Message: "No current article selected"}.String())
+		}
+		getByArticleNum = false
 	}
 
 	if len(arguments) > 1 {
 		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
 	}
 
-	getByArticleNum := true
-	num, err := strconv.Atoi(arguments[0])
-	if err != nil {
-		getByArticleNum = false
+	var num int
+	if getByArticleNum {
+		num, err = strconv.Atoi(arguments[0])
+		if err != nil {
+			getByArticleNum = false
+		}
 	}
 
 	if getByArticleNum && s.currentGroup == nil {
 		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 412, Message: "No newsgroup selected"}.String())
 	}
 
-	var a models.Article
+	var a *models.Article
 
 	if getByArticleNum {
-		a, err = h.backend.GetArticleByNumber(s.currentGroup, num)
+		article, err := h.backend.GetArticleByNumber(s.currentGroup, num)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 423, Message: "No article with that number"}.String())
@@ -424,8 +440,10 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 				return err
 			}
 		}
-	} else {
-		a, err = h.backend.GetArticle(arguments[0])
+		a = &article
+		s.currentArticle = &article
+	} else if len(arguments) > 0 {
+		article, err := h.backend.GetArticle(arguments[0])
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 430, Message: "No Such Article Found"}.String())
@@ -433,9 +451,12 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 				return err
 			}
 		}
+		a = &article
+		s.currentArticle = &article
+	} else {
+		a = s.currentArticle
+		num = s.currentArticle.ArticleNumber
 	}
-
-	s.currentArticle = &a
 
 	switch command {
 	case protocol.CommandArticle:
