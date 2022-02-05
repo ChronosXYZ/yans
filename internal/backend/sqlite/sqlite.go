@@ -175,24 +175,24 @@ func (sb *SQLiteBackend) GetArticleNumbers(g *models.Group, low, high int64) ([]
 
 func (sb *SQLiteBackend) GetLastArticleByNum(g *models.Group, a *models.Article) (models.Article, error) {
 	var lastArticle models.Article
-	if err := sb.db.Get(&lastArticle, "SELECT articles.* FROM articles INNER JOIN articles_to_groups atg on atg.article_id = articles.id WHERE atg.article_number < ? AND atg.group_id = ? LIMIT 1", a.ArticleNumber, g.ID); err != nil {
+	if err := sb.db.Get(&lastArticle, "SELECT articles.* FROM articles INNER JOIN articles_to_groups atg on atg.article_id = articles.id WHERE atg.article_number < ? AND atg.group_id = ? ORDER BY atg.article_number DESC LIMIT 1", a.ArticleNumber, g.ID); err != nil {
 		return lastArticle, err
 	}
-	if err := sb.db.Get(&a.ArticleNumber, "SELECT article_number FROM articles_to_groups WHERE article_id = ?", a.ID); err != nil {
+	if err := sb.db.Get(&lastArticle.ArticleNumber, "SELECT article_number FROM articles_to_groups WHERE article_id = ?", lastArticle.ID); err != nil {
 		return lastArticle, err
 	}
-	return lastArticle, json.Unmarshal([]byte(a.HeaderRaw), &a.Header)
+	return lastArticle, json.Unmarshal([]byte(lastArticle.HeaderRaw), &lastArticle.Header)
 }
 
 func (sb *SQLiteBackend) GetNextArticleByNum(g *models.Group, a *models.Article) (models.Article, error) {
-	var lastArticle models.Article
-	if err := sb.db.Get(&lastArticle, "SELECT articles.* FROM articles INNER JOIN articles_to_groups atg on atg.article_id = articles.id WHERE atg.article_number > ? AND atg.group_id = ? LIMIT 1", a.ArticleNumber, g.ID); err != nil {
-		return lastArticle, err
+	var nextArticle models.Article
+	if err := sb.db.Get(&nextArticle, "SELECT articles.* FROM articles INNER JOIN articles_to_groups atg on atg.article_id = articles.id WHERE atg.article_number > ? AND atg.group_id = ? ORDER BY atg.article_number LIMIT 1", a.ArticleNumber, g.ID); err != nil {
+		return nextArticle, err
 	}
-	if err := sb.db.Get(&a.ArticleNumber, "SELECT article_number FROM articles_to_groups WHERE article_id = ?", a.ID); err != nil {
-		return lastArticle, err
+	if err := sb.db.Get(&nextArticle.ArticleNumber, "SELECT article_number FROM articles_to_groups WHERE article_id = ?", nextArticle.ID); err != nil {
+		return nextArticle, err
 	}
-	return lastArticle, json.Unmarshal([]byte(a.HeaderRaw), &a.Header)
+	return nextArticle, json.Unmarshal([]byte(nextArticle.HeaderRaw), &nextArticle.Header)
 }
 
 func (sb *SQLiteBackend) GetNewArticlesSince(timestamp int64) ([]string, error) {

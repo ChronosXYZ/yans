@@ -664,6 +664,8 @@ func (h *Handler) handleLast(s *Session, command string, arguments []string, id 
 		return err
 	}
 
+	s.currentArticle = &a
+
 	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 223, Message: fmt.Sprintf("%d %s retrieved", a.ArticleNumber, a.Header.Get("Message-ID"))}.String())
 }
 
@@ -700,7 +702,9 @@ func (h *Handler) handleNext(s *Session, command string, arguments []string, id 
 		return err
 	}
 
-	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 223, Message: fmt.Sprintf("%d %s retrieved", a.ArticleNumber, a.Header.Get("Message-ID"))}.String())
+	s.currentArticle = &a
+
+	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 223, Message: fmt.Sprintf("%d %s retrieved", a.ArticleNumber, a.Header.Get("Message-Id"))}.String())
 }
 
 func (h *Handler) Handle(s *Session, message string, id uint) error {
