@@ -15,27 +15,39 @@
 - :x: Authentication
 
 #### Commands
-- :heavy_check_mark: `CAPABILITIES`
-- :heavy_check_mark: `DATE`
-- :heavy_check_mark: `LIST ACTIVE`
-- :heavy_check_mark: `LIST NEWSGROUPS`
-- :heavy_check_mark: `MODE READER`
-- :heavy_check_mark: `QUIT`
-- :heavy_check_mark: `ARTICLE`
-- :x: `BODY`
-- :heavy_check_mark: `GROUP`
-- :x: `HDR`
-- :x: `HEAD`
-- :x: `HELP`
-- :x: `IHAVE`
-- :x: `LAST`
-- :heavy_check_mark: `LISTGROUP`
-- :heavy_check_mark: `NEWGROUPS`
-- :x: `NEWNEWS`
-- :x: `NEXT`
-- :x: `OVER`
-- :construction: `POST`
-- :x: `STAT`
+
+- :heavy_check_mark: Session Administration Commands
+  - :heavy_check_mark: `MODE READER`
+  - :heavy_check_mark: `CAPABILITIES`
+  - :heavy_check_mark: `QUIT`
+- :construction: Article posting
+  - :construction: `POST`
+  - :x: `IHAVE`
+- :construction: Article retrieving
+  - :heavy_check_mark: `ARTICLE`
+  - :x: `HEAD`
+  - :x: `BODY`
+  - :x: `STAT`
+- :x: Articles overview
+  - :x: `OVER`
+  - :x: `LIST OVERVIEW.FMT`
+  - :x: `HDR`
+  - :x: `LIST HEADERS`
+- :construction: Group and Article Selection
+  - :heavy_check_mark: `GROUP`
+  - :heavy_check_mark: `LISTGROUP`
+  - :x: `LAST`
+  - :x: `NEXT`
+- :construction: The LIST Commands
+  - :heavy_check_mark: `LIST ACTIVE`
+  - :heavy_check_mark: `LIST NEWSGROUPS`
+  - :x: LIST ACTIVE.TIMES
+  - :x: LIST DISTRIB.PATS
+- :construction: Information Commands
+  - :heavy_check_mark: `DATE`
+  - :x: `HELP`
+  - :heavy_check_mark: `NEWGROUPS`
+  - :x: `NEWNEWS`
 
 ## License
 
