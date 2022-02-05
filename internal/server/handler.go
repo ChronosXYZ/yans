@@ -71,8 +71,6 @@ func (h *Handler) handleQuit(s *Session, command string, arguments []string, id 
 }
 
 func (h *Handler) handleList(s *Session, command string, arguments []string, id uint) error {
-	sb := strings.Builder{}
-
 	listType := ""
 	if len(arguments) != 0 {
 		listType = arguments[0]
@@ -86,6 +84,7 @@ func (h *Handler) handleList(s *Session, command string, arguments []string, id 
 		fallthrough
 	case "ACTIVE":
 		{
+			dw := s.tconn.DotWriter()
 			var groups []models.Group
 			var err error
 			if len(arguments) == 2 {
@@ -97,7 +96,7 @@ func (h *Handler) handleList(s *Session, command string, arguments []string, id 
 			if err != nil {
 				return err
 			}
-			sb.Write([]byte(protocol.NNTPResponse{Code: 215, Message: "list of newsgroups follows"}.String() + protocol.CRLF))
+			dw.Write([]byte(protocol.NNTPResponse{Code: 215, Message: "list of newsgroups follows"}.String() + protocol.CRLF))
 			for _, v := range groups {
 				// TODO set actual post permission status
 				c, err := h.backend.GetArticlesCount(&v)
@@ -113,14 +112,16 @@ func (h *Handler) handleList(s *Session, command string, arguments []string, id 
 					if err != nil {
 						return err
 					}
-					sb.Write([]byte(fmt.Sprintf("%s %d %d n"+protocol.CRLF, v.GroupName, highWaterMark, lowWaterMark)))
+					dw.Write([]byte(fmt.Sprintf("%s %d %d n"+protocol.CRLF, v.GroupName, highWaterMark, lowWaterMark)))
 				} else {
-					sb.Write([]byte(fmt.Sprintf("%s 0 1 n"+protocol.CRLF, v.GroupName)))
+					dw.Write([]byte(fmt.Sprintf("%s 0 1 n"+protocol.CRLF, v.GroupName)))
 				}
 			}
+			return dw.Close()
 		}
 	case "NEWSGROUPS":
 		{
+			dw := s.tconn.DotWriter()
 			var groups []models.Group
 			var err error
 			if len(arguments) == 2 {
@@ -132,7 +133,7 @@ func (h *Handler) handleList(s *Session, command string, arguments []string, id 
 				return err
 			}
 
-			sb.Write([]byte(protocol.NNTPResponse{Code: 215, Message: "list of newsgroups follows"}.String() + protocol.CRLF))
+			dw.Write([]byte(protocol.NNTPResponse{Code: 215, Message: "list of newsgroups follows"}.String() + protocol.CRLF))
 			for _, v := range groups {
 				desc := ""
 				if v.Description == nil {
@@ -140,18 +141,30 @@ func (h *Handler) handleList(s *Session, command string, arguments []string, id 
 				} else {
 					desc = *v.Description
 				}
-				sb.Write([]byte(fmt.Sprintf("%s %s"+protocol.CRLF, v.GroupName, desc)))
+				dw.Write([]byte(fmt.Sprintf("%s %s"+protocol.CRLF, v.GroupName, desc)))
 			}
+			return dw.Close()
+		}
+	case "OVERVIEW.FMT":
+		{
+			dw := s.tconn.DotWriter()
+
+			dw.Write([]byte(protocol.NNTPResponse{Code: 215, Message: "Order of fields in overview database."}.String() + protocol.CRLF))
+			dw.Write([]byte("Subject:" + protocol.CRLF))
+			dw.Write([]byte("From:" + protocol.CRLF))
+			dw.Write([]byte("Date:" + protocol.CRLF))
+			dw.Write([]byte("Message-ID:" + protocol.CRLF))
+			dw.Write([]byte("References:" + protocol.CRLF))
+			dw.Write([]byte(":bytes" + protocol.CRLF))
+			dw.Write([]byte(":lines" + protocol.CRLF))
+
+			return dw.Close()
 		}
 	default:
 		{
 			return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
 		}
 	}
-
-	sb.Write([]byte(protocol.MultilineEnding))
-
-	return s.tconn.PrintfLine(sb.String())
 }
 
 func (h *Handler) handleModeReader(s *Session, command string, arguments []string, id uint) error {
@@ -165,7 +178,7 @@ func (h *Handler) handleModeReader(s *Session, command string, arguments []strin
 	(&s.capabilities).Remove(protocol.ModeReaderCapability)
 	(&s.capabilities).Remove(protocol.ListCapability)
 	(&s.capabilities).Add(protocol.Capability{Type: protocol.ReaderCapability})
-	(&s.capabilities).Add(protocol.Capability{Type: protocol.ListCapability, Params: "ACTIVE NEWSGROUPS"})
+	(&s.capabilities).Add(protocol.Capability{Type: protocol.ListCapability, Params: "ACTIVE NEWSGROUPS OVERVIEW.FMT"})
 	s.mode = SessionModeReader
 
 	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 201, Message: "Reader mode, posting prohibited"}.String()) // TODO vary on auth status

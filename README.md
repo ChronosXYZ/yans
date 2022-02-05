@@ -30,7 +30,7 @@
   - :heavy_check_mark: `STAT`
 - :construction: Articles overview
   - :heavy_check_mark: `OVER`
-  - :x: `LIST OVERVIEW.FMT`
+  - :heavy_check_mark: `LIST OVERVIEW.FMT`
   - :x: `HDR`
   - :x: `LIST HEADERS`
 - :heavy_check_mark: Group and Article Selection
