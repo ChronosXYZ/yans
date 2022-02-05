@@ -2,6 +2,7 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -797,7 +798,16 @@ func (h *Handler) handleOver(s *Session, command string, arguments []string, id 
 		dw.Write([]byte(v.Header.Get("Message-ID") + "	"))
 		dw.Write([]byte(v.Header.Get("References") + "	"))
 
-		bytesMetadata := len([]byte(v.Body))
+		// count bytes for message
+		m := utils.NewMessage()
+		for k, v := range v.Header {
+			m.SetHeader(k, v...)
+		}
+		m.SetBody("text/plain", v.Body) // FIXME currently only plain text is supported
+		b := bytes.NewBuffer([]byte{})
+		m.WriteTo(b)
+
+		bytesMetadata := b.Len()
 		linesMetadata := strings.Count(v.Body, "\n")
 
 		dw.Write([]byte(strconv.Itoa(bytesMetadata) + "	"))
