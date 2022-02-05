@@ -49,11 +49,11 @@ func (h *Handler) handleCapabilities(s *Session, arguments []string, id uint) er
 func (h *Handler) handleDate(s *Session, arguments []string, id uint) error {
 	s.tconn.StartResponse(id)
 	defer s.tconn.EndResponse(id)
-	return s.tconn.PrintfLine("111 %s", time.Now().UTC().Format("20060102150405"))
+	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 111, Message: time.Now().UTC().Format("20060102150405")}.String())
 }
 
 func (h *Handler) handleQuit(s *Session, arguments []string, id uint) error {
-	s.tconn.PrintfLine(protocol.MessageNNTPServiceExitsNormally)
+	s.tconn.PrintfLine(protocol.NNTPResponse{Code: 205, Message: "NNTP Service exits normally, bye!"}.String())
 	s.conn.Close()
 	return nil
 }
@@ -85,7 +85,7 @@ func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
 			if err != nil {
 				return err
 			}
-			sb.Write([]byte(protocol.MessageListOfNewsgroupsFollows + protocol.CRLF))
+			sb.Write([]byte(protocol.NNTPResponse{Code: 215, Message: "list of newsgroups follows"}.String() + protocol.CRLF))
 			for _, v := range groups {
 				// TODO set actual post permission status
 				c, err := h.backend.GetArticlesCount(&v)
@@ -120,7 +120,7 @@ func (h *Handler) handleList(s *Session, arguments []string, id uint) error {
 				return err
 			}
 
-			sb.Write([]byte(protocol.MessageListOfNewsgroupsFollows + protocol.CRLF))
+			sb.Write([]byte(protocol.NNTPResponse{Code: 215, Message: "list of newsgroups follows"}.String() + protocol.CRLF))
 			for _, v := range groups {
 				desc := ""
 				if v.Description == nil {
@@ -156,7 +156,7 @@ func (h *Handler) handleModeReader(s *Session, arguments []string, id uint) erro
 	(&s.capabilities).Add(protocol.Capability{Type: protocol.ListCapability, Params: "ACTIVE NEWSGROUPS"})
 	s.mode = SessionModeReader
 
-	return s.tconn.PrintfLine(protocol.MessageReaderModePostingProhibited) // TODO vary on auth status
+	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 201, Message: "Reader mode, posting prohibited"}.String()) // TODO vary on auth status
 }
 
 func (h *Handler) handleGroup(s *Session, arguments []string, id uint) error {
@@ -170,7 +170,7 @@ func (h *Handler) handleGroup(s *Session, arguments []string, id uint) error {
 	g, err := h.backend.GetGroup(arguments[0])
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return s.tconn.PrintfLine(protocol.MessageNoSuchGroup)
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 411, Message: "No such newsgroup"}.String())
 		} else {
 			return err
 		}
@@ -266,7 +266,7 @@ func (h *Handler) handlePost(s *Session, arguments []string, id uint) error {
 		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
 	}
 
-	if err := s.tconn.PrintfLine(protocol.MessageInputArticle); err != nil {
+	if err := s.tconn.PrintfLine(protocol.NNTPResponse{Code: 340, Message: "Input article; end with <CR-LF>.<CR-LF>"}.String()); err != nil {
 		return err
 	}
 
@@ -324,7 +324,7 @@ func (h *Handler) handlePost(s *Session, arguments []string, id uint) error {
 		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: err.Error()}.String())
 	}
 
-	return s.tconn.PrintfLine(protocol.MessageArticleReceived)
+	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 240, Message: "Article received OK"}.String())
 }
 
 func (h *Handler) handleListgroup(s *Session, arguments []string, id uint) error {

@@ -70,14 +70,3 @@ const (
 	CapabilityNameImplementation = "IMPLEMENTATION"
 	CapabilityNameModeReader     = "MODE-READER"
 )
-
-const (
-	MessageNNTPServiceReadyPostingProhibited = "201 YANS NNTP Service Ready, posting prohibited"
-	MessageReaderModePostingProhibited       = "201 Reader mode, posting prohibited"
-	MessageNNTPServiceExitsNormally          = "205 NNTP Service exits normally, bye!"
-	MessageErrorHappened                     = "403 Failed to process command:"
-	MessageListOfNewsgroupsFollows           = "215 list of newsgroups follows"
-	MessageNoSuchGroup                       = "411 No such newsgroup"
-	MessageInputArticle                      = "340 Input article; end with <CR-LF>.<CR-LF>"
-	MessageArticleReceived                   = "240 Article received OK"
-)

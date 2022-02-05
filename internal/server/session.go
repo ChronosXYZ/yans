@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"github.com/ChronosX88/yans/internal/models"
 	"github.com/ChronosX88/yans/internal/protocol"
 	"io"
@@ -61,7 +62,7 @@ func (s *Session) loop() {
 		close(s.closed)
 	}()
 
-	err := s.tconn.PrintfLine(protocol.MessageNNTPServiceReadyPostingProhibited) // by default access mode is read-only
+	err := s.tconn.PrintfLine(protocol.NNTPResponse{Code: 201, Message: "YANS NNTP Service Ready, posting prohibited"}.String()) // by default access mode is read-only
 	if err != nil {
 		s.conn.Close()
 		return
@@ -90,7 +91,7 @@ func (s *Session) loop() {
 				err = s.h.Handle(s, message, id)
 				if err != nil {
 					log.Print(err)
-					s.tconn.PrintfLine("%s %s", protocol.MessageErrorHappened, err.Error())
+					s.tconn.PrintfLine(protocol.NNTPResponse{Code: 403, Message: fmt.Sprintf("Failed to process command: %s", err.Error())}.String())
 					s.conn.Close()
 					return
 				}
