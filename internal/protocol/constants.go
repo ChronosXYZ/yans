@@ -62,6 +62,7 @@ const (
 	CommandStat         = "STAT"
 	CommandHelp         = "HELP"
 	CommandNewNews      = "NEWNEWS"
+	CommandLast         = "LAST"
 )
 
 const (

@@ -36,7 +36,7 @@
 - :construction: Group and Article Selection
   - :heavy_check_mark: `GROUP`
   - :heavy_check_mark: `LISTGROUP`
-  - :x: `LAST`
+  - :heavy_check_mark: `LAST`
   - :x: `NEXT`
 - :construction: The LIST Commands
   - :heavy_check_mark: `LIST ACTIVE`
