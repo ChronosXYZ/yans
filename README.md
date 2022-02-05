@@ -43,11 +43,11 @@
   - :heavy_check_mark: `LIST NEWSGROUPS`
   - :x: `LIST ACTIVE.TIMES`
   - :x: `LIST DISTRIB.PATS`
-- :construction: Information Commands
+- :heavy_check_mark: Information Commands
   - :heavy_check_mark: `DATE`
   - :heavy_check_mark: `HELP`
   - :heavy_check_mark: `NEWGROUPS`
-  - :x: `NEWNEWS`
+  - :heavy_check_mark: `NEWNEWS`
 
 ## License
 

@@ -41,6 +41,7 @@ func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 		protocol.CommandBody:         h.handleArticle,
 		protocol.CommandStat:         h.handleArticle,
 		protocol.CommandHelp:         h.handleHelp,
+		protocol.CommandNewNews:      h.handleNewNews,
 	}
 	h.serverDomain = serverDomain
 	return h
@@ -530,6 +531,7 @@ func (h *Handler) handleHelp(s *Session, command string, arguments []string, id 
 			"  LISTGROUP [newsgroup [range]]\r\n" +
 			"  MODE READER\r\n" +
 			"  NEWGROUPS [yy]yymmdd hhmmss [GMT]\r\n" +
+			"  NEWNEWS [yy]yymmdd hhmmss [GMT]\r\n" +
 			"  NEXT\r\n" +
 			"  POST\r\n" +
 			"  QUIT\r\n" +
@@ -551,6 +553,53 @@ func (h *Handler) handleHelp(s *Session, command string, arguments []string, id 
 	err = w.Flush()
 	if err != nil {
 		return err
+	}
+
+	return dw.Close()
+}
+
+func (h *Handler) handleNewNews(s *Session, command string, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if len(arguments) < 2 || len(arguments) > 3 {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	dateString := arguments[0] + " " + arguments[1]
+
+	var date time.Time
+
+	var err error
+	if len(dateString) == 15 {
+		date, err = time.Parse("20060102 150405", dateString)
+		if err != nil {
+			return err
+		}
+	} else if len(dateString) == 13 {
+		date, err = time.Parse("060102 150405", dateString)
+		if err != nil {
+			return err
+		}
+	} else {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	a, err := h.backend.GetNewArticlesSince(date.Unix())
+	if err != nil {
+		return err
+	}
+
+	dw := s.tconn.DotWriter()
+	_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 230, Message: "list of new articles by message-id follows"}.String() + protocol.CRLF))
+	if err != nil {
+		return err
+	}
+	for _, v := range a {
+		_, err = dw.Write([]byte(v + protocol.CRLF))
+		if err != nil {
+			return err
+		}
 	}
 
 	return dw.Close()

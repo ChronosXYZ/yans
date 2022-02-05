@@ -18,4 +18,5 @@ type StorageBackend interface {
 	GetArticle(messageID string) (models.Article, error)
 	GetArticleByNumber(g *models.Group, num int) (models.Article, error)
 	GetArticleNumbers(g *models.Group, low, high int64) ([]int64, error)
+	GetNewArticlesSince(timestamp int64) ([]string, error)
 }

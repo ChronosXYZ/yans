@@ -168,3 +168,8 @@ func (sb *SQLiteBackend) GetArticleNumbers(g *models.Group, low, high int64) ([]
 
 	return numbers, nil
 }
+
+func (sb *SQLiteBackend) GetNewArticlesSince(timestamp int64) ([]string, error) {
+	var articleIds []string
+	return articleIds, sb.db.Select(&articleIds, "SELECT json_extract(articles.header, '$.Message-Id[0]') FROM articles WHERE created_at > datetime(?, 'unixepoch')", timestamp)
+}
