@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"github.com/jhillyerd/enmime"
 	"net/textproto"
 	"time"
 )
@@ -14,5 +15,6 @@ type Article struct {
 	Thread    sql.NullString `db:"thread"`
 
 	Header        textproto.MIMEHeader `db:"-"`
+	Envelope      *enmime.Envelope     `db:"-"`
 	ArticleNumber int                  `db:"-"`
 }

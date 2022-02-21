@@ -11,7 +11,7 @@ import (
 	"github.com/ChronosX88/yans/internal/protocol"
 	"github.com/ChronosX88/yans/internal/utils"
 	"github.com/google/uuid"
-	"io"
+	"github.com/jhillyerd/enmime"
 	"net/mail"
 	"strconv"
 	"strings"
@@ -304,43 +304,42 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 		return err
 	}
 
-	headers, err := s.tconn.ReadMIMEHeader()
+	dr := s.tconn.DotReader()
+
+	envelope, err := enmime.ReadEnvelope(dr)
 	if err != nil {
 		return err
 	}
 
 	// generate message id
 	messageID := fmt.Sprintf("<%s@%s>", uuid.New().String(), h.serverDomain)
-	headers.Set("Message-ID", messageID)
+	envelope.SetHeader("Message-ID", []string{messageID})
 
 	// set path header
-	headers.Set("Path", fmt.Sprintf("%s!not-for-mail", h.serverDomain))
+	envelope.SetHeader("Path", []string{fmt.Sprintf("%s!not-for-mail", h.serverDomain)})
 
 	// set date header
-	if headers.Get("Date") == "" {
-		headers.Set("Date", time.Now().UTC().Format(time.RFC1123Z))
-	}
+	envelope.AddHeader("Date", time.Now().UTC().Format(time.RFC1123Z))
 
-	headerJson, err := json.Marshal(headers)
+	headerJson, err := json.Marshal(envelope.Root.Header)
 	if err != nil {
 		return err
 	}
 
 	a := models.Article{}
 	a.HeaderRaw = string(headerJson)
-	a.Header = headers
+	a.Header = envelope.Root.Header
+	a.Envelope = envelope
 
-	dr := s.tconn.DotReader()
 	// TODO handle multipart message
-	body, err := io.ReadAll(dr)
 	if err != nil {
 		return err
 	}
-	a.Body = string(body)
+	a.Body = string(envelope.Text)
 
 	// set thread property
-	if headers.Get("In-Reply-To") != "" {
-		parentMessage, err := h.backend.GetArticle(headers.Get("In-Reply-To"))
+	if envelope.GetHeader("In-Reply-To") != "" {
+		parentMessage, err := h.backend.GetArticle(envelope.GetHeader("In-Reply-To"))
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: "no such message you are replying to"}.String())
@@ -487,18 +486,19 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 	switch command {
 	case protocol.CommandArticle:
 		{
-			m := utils.NewMessage()
-			for k, v := range a.Header {
-				m.SetHeader(k, v...)
-			}
-
-			m.SetBody("text/plain", a.Body) // FIXME currently only plain text is supported
 			dw := s.tconn.DotWriter()
-			_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 220, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
+			builder := utils.Builder()
+			for k, v := range a.Header {
+				for _, j := range v {
+					builder = builder.Header(k, j)
+				}
+			}
+			builder = builder.Text([]byte(a.Body)) // FIXME currently only plain text is supported
+			p, err := builder.Build()
 			if err != nil {
 				return err
 			}
-			_, err = m.WriteTo(dw)
+			err = p.Encode(dw)
 			if err != nil {
 				return err
 			}
@@ -507,9 +507,15 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 		}
 	case protocol.CommandHead:
 		{
-			m := utils.NewMessage()
+			builder := utils.Builder()
 			for k, v := range a.Header {
-				m.SetHeader(k, v...)
+				for _, j := range v {
+					builder = builder.Header(k, j)
+				}
+			}
+			p, err := builder.Build()
+			if err != nil {
+				return err
 			}
 
 			dw := s.tconn.DotWriter()
@@ -517,7 +523,7 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 			if err != nil {
 				return err
 			}
-			_, err = m.WriteTo(dw)
+			err = p.Encode(dw)
 			if err != nil {
 				return err
 			}
@@ -526,12 +532,6 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 		}
 	case protocol.CommandBody:
 		{
-			m := utils.NewMessage()
-			for k, v := range a.Header {
-				m.SetHeader(k, v...)
-			}
-
-			m.SetBody("text/plain", a.Body) // FIXME currently only plain text is supported
 			dw := s.tconn.DotWriter()
 
 			_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 222, Message: fmt.Sprintf("%d %s", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
@@ -812,13 +812,22 @@ func (h *Handler) handleOver(s *Session, command string, arguments []string, id 
 		dw.Write([]byte(v.Header.Get("References") + "	"))
 
 		// count bytes for message
-		m := utils.NewMessage()
+		builder := utils.Builder()
 		for k, v := range v.Header {
-			m.SetHeader(k, v...)
+			for _, j := range v {
+				builder = builder.Header(k, j)
+			}
 		}
-		m.SetBody("text/plain", v.Body) // FIXME currently only plain text is supported
+		builder = builder.Text([]byte(v.Body)) // FIXME currently only plain text is supported
 		b := bytes.NewBuffer([]byte{})
-		m.WriteTo(b)
+		p, err := builder.Build()
+		if err != nil {
+			return err
+		}
+		err = p.Encode(b)
+		if err != nil {
+			return err
+		}
 
 		bytesMetadata := b.Len()
 		linesMetadata := strings.Count(v.Body, "\n")
