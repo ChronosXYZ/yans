@@ -15,6 +15,7 @@ type Config struct {
 	BackendType string              `toml:"backend_type"`
 	Domain      string              `toml:"domain"`
 	SQLite      SQLiteBackendConfig `toml:"sqlite"`
+	UploadPath  string              `toml:"upload_path"`
 }
 
 type SQLiteBackendConfig struct {

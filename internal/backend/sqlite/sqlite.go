@@ -124,6 +124,15 @@ func (sb *SQLiteBackend) SaveArticle(a models.Article, groups []string) error {
 			return err
 		}
 	}
+
+	// save attachments into db
+	for _, v := range a.Attachments {
+		_, err = sb.db.Exec("INSERT INTO attachments_articles_mapping (article_id, content_type, attachment_id) VALUES (?, ?, ?)", articleID, v.ContentType, v.FileName)
+		if err != nil {
+			return err
+		}
+	}
+
 	return err
 }
 
@@ -135,6 +144,9 @@ func (sb *SQLiteBackend) GetArticle(messageID string) (models.Article, error) {
 	if err := sb.db.Get(&a.ArticleNumber, "SELECT article_number FROM articles_to_groups WHERE article_id = ?", a.ID); err != nil {
 		return a, err
 	}
+	if err := sb.db.Select(&a.Attachments, "SELECT content_type, attachment_id FROM attachments_articles_mapping WHERE article_id = ?", a.ID); err != nil {
+		return a, err
+	}
 	return a, json.Unmarshal([]byte(a.HeaderRaw), &a.Header)
 }
 
@@ -144,6 +156,9 @@ func (sb *SQLiteBackend) GetArticleByNumber(g *models.Group, num int) (models.Ar
 		return a, err
 	}
 	a.ArticleNumber = num
+	if err := sb.db.Select(&a.Attachments, "SELECT content_type, attachment_id FROM attachments_articles_mapping WHERE article_id = ?", a.ID); err != nil {
+		return a, err
+	}
 	return a, json.Unmarshal([]byte(a.HeaderRaw), &a.Header)
 }
 

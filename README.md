@@ -9,9 +9,9 @@
 - :heavy_check_mark: Wildmat support
 - :heavy_check_mark: Database (SQLite)
 - :heavy_check_mark: Basic article posting
-- :construction: Article retrieving
-- :construction: Multipart article support
-- :x: Transit mode
+- :heavy_check_mark: Article retrieving
+- :heavy_check_mark: Multipart article support
+- :construction: Transit mode
 - :x: Authentication
 
 #### Commands
@@ -21,8 +21,8 @@
   - :heavy_check_mark: `CAPABILITIES`
   - :heavy_check_mark: `QUIT`
 - :construction: Article posting
-  - :construction: `POST`
-  - :x: `IHAVE`
+  - :heavy_check_mark: `POST`
+  - :construction: `IHAVE`
 - :heavy_check_mark: Article retrieving
   - :heavy_check_mark: `ARTICLE`
   - :heavy_check_mark: `HEAD`

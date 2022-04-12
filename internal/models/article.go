@@ -17,4 +17,10 @@ type Article struct {
 	Header        textproto.MIMEHeader `db:"-"`
 	Envelope      *enmime.Envelope     `db:"-"`
 	ArticleNumber int                  `db:"-"`
+	Attachments   []Attachment
+}
+
+type Attachment struct {
+	ContentType string `db:"content_type"`
+	FileName    string `db:"attachment_id"`
 }

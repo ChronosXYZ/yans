@@ -1,3 +1,4 @@
 *.db
 .config.toml
 .idea
+.upload

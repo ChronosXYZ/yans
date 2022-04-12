@@ -12,7 +12,9 @@ import (
 	"github.com/ChronosX88/yans/internal/utils"
 	"github.com/google/uuid"
 	"github.com/jhillyerd/enmime"
+	"io/ioutil"
 	"net/mail"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -22,9 +24,10 @@ type Handler struct {
 	handlers     map[string]func(s *Session, command string, arguments []string, id uint) error
 	backend      backend.StorageBackend
 	serverDomain string
+	uploadPath   string
 }
 
-func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
+func NewHandler(b backend.StorageBackend, serverDomain, uploadPath string) *Handler {
 	h := &Handler{}
 	h.backend = b
 	h.handlers = map[string]func(s *Session, command string, arguments []string, id uint) error{
@@ -49,6 +52,7 @@ func NewHandler(b backend.StorageBackend, serverDomain string) *Handler {
 		protocol.CommandXover:        h.handleOver,
 	}
 	h.serverDomain = serverDomain
+	h.uploadPath = uploadPath
 	return h
 }
 
@@ -347,13 +351,29 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 				return err
 			}
 		}
-		if !parentMessage.Thread.Valid {
-			var parentHeader mail.Header
-			err = json.Unmarshal([]byte(parentMessage.HeaderRaw), &parentHeader)
-			parentMessageID := parentHeader.Get("Message-ID")
-			a.Thread = sql.NullString{String: parentMessageID, Valid: true}
-		} else {
-			a.Thread = parentMessage.Thread
+		var parentHeader mail.Header
+		err = json.Unmarshal([]byte(parentMessage.HeaderRaw), &parentHeader)
+		parentMessageID := parentHeader.Get("Message-ID")
+		a.Thread = sql.NullString{String: parentMessageID, Valid: true}
+	}
+
+	if len(envelope.Attachments) > 0 {
+		// save attachments
+		for _, v := range envelope.Attachments {
+			if v.ContentType != "image/jpeg" && v.ContentType != "image/png" && v.ContentType != "image/gif" {
+				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: "disallowed attachment type"}.String())
+			}
+			ext_ := strings.Split(v.FileName, ".")
+			ext := ext_[len(ext_)-1]
+			fileName := uuid.New().String() + "." + ext
+			err = ioutil.WriteFile(path.Join(h.uploadPath, fileName), v.Content, 0644)
+			if err != nil {
+				return err
+			}
+			a.Attachments = append(a.Attachments, models.Attachment{
+				ContentType: v.ContentType,
+				FileName:    fileName,
+			})
 		}
 	}
 
@@ -493,7 +513,10 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 					builder = builder.Header(k, j)
 				}
 			}
-			builder = builder.Text([]byte(a.Body)) // FIXME currently only plain text is supported
+			builder = builder.Text([]byte(a.Body))
+			for _, v := range a.Attachments {
+				builder = builder.AddFileAttachment(path.Join(h.uploadPath, v.FileName))
+			}
 			p, err := builder.Build()
 			if err != nil {
 				return err

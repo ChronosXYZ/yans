@@ -97,7 +97,7 @@ func (ns *NNTPServer) Start() error {
 
 					id, _ := uuid.NewUUID()
 					closed := make(chan bool)
-					session, err := NewSession(ctx, conn, Capabilities, id.String(), closed, NewHandler(ns.backend, ns.cfg.Domain))
+					session, err := NewSession(ctx, conn, Capabilities, id.String(), closed, NewHandler(ns.backend, ns.cfg.Domain, ns.cfg.UploadPath))
 					ns.sessionPoolMutex.Lock()
 					ns.sessionPool[id.String()] = session
 					ns.sessionPoolMutex.Unlock()
