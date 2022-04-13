@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/ChronosX88/yans/internal/models"
 	"github.com/ChronosX88/yans/internal/protocol"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/textproto"
+	"strings"
 )
 
 type SessionMode int
@@ -23,6 +25,7 @@ type Session struct {
 	capabilities protocol.Capabilities
 	conn         net.Conn
 	tconn        *textproto.Conn
+	remoteAddr   string
 	id           string
 	closed       chan<- bool
 	h            *Handler
@@ -32,7 +35,15 @@ type Session struct {
 	mode           SessionMode
 }
 
-func NewSession(ctx context.Context, conn net.Conn, caps protocol.Capabilities, id string, closed chan<- bool, handler *Handler) (*Session, error) {
+func NewSession(
+	ctx context.Context,
+	conn net.Conn,
+	remoteAddr string,
+	caps protocol.Capabilities,
+	id string,
+	closed chan<- bool,
+	handler *Handler,
+) (*Session, error) {
 	var err error
 	defer func() {
 		if err != nil {
@@ -46,6 +57,7 @@ func NewSession(ctx context.Context, conn net.Conn, caps protocol.Capabilities, 
 		ctx:          ctx,
 		conn:         conn,
 		tconn:        tconn,
+		remoteAddr:   remoteAddr,
 		capabilities: caps,
 		id:           id,
 		closed:       closed,
@@ -79,8 +91,8 @@ func (s *Session) loop() {
 				s.tconn.StartRequest(id)
 				message, err := s.tconn.ReadLine()
 				if err != nil {
-					if err == io.EOF || err.(*net.OpError).Unwrap() == net.ErrClosed {
-						log.Printf("Client %s has diconnected!", s.conn.RemoteAddr().String())
+					if err == io.EOF || errors.Is(err, net.ErrClosed) || strings.Contains(err.Error(), "StatusNormalClosure") {
+						log.Printf("Client %s has diconnected!", s.remoteAddr)
 					} else {
 						log.Print(err)
 						s.conn.Close()
@@ -88,7 +100,7 @@ func (s *Session) loop() {
 					return
 				}
 				s.tconn.EndRequest(id)
-				log.Printf("Received message from %s: %s", s.conn.RemoteAddr().String(), message) // for debugging
+				log.Printf("Received message from %s: %s", s.remoteAddr, message) // for debugging
 				err = s.h.Handle(s, message, id)
 				if err != nil {
 					log.Print(err)

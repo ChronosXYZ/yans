@@ -11,6 +11,8 @@ import (
 	"github.com/google/uuid"
 	"log"
 	"net"
+	"net/http"
+	"nhooyr.io/websocket"
 	"sync"
 )
 
@@ -95,33 +97,59 @@ func (ns *NNTPServer) Start() error {
 					}
 					log.Printf("Client %s has connected!", conn.RemoteAddr().String())
 
-					id, _ := uuid.NewUUID()
-					closed := make(chan bool)
-					session, err := NewSession(ctx, conn, Capabilities, id.String(), closed, NewHandler(ns.backend, ns.cfg.Domain, ns.cfg.UploadPath))
-					ns.sessionPoolMutex.Lock()
-					ns.sessionPool[id.String()] = session
-					ns.sessionPoolMutex.Unlock()
-					go func(ctx context.Context, id string, closed chan bool) {
-						for {
-							select {
-							case <-ctx.Done():
-								break
-							case _, ok := <-closed:
-								{
-									if !ok {
-										ns.sessionPoolMutex.Lock()
-										delete(ns.sessionPool, id)
-										ns.sessionPoolMutex.Unlock()
-										return
-									}
-								}
-							}
-						}
-					}(ctx, id.String(), closed)
+					if err := ns.handleConn(ctx, conn, conn.RemoteAddr().String()); err != nil {
+						log.Println(err)
+					}
 				}
 			}
 		}
 	}(ns.ctx)
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		log.Printf("Client %s has connected!", r.RemoteAddr)
+
+		if err := ns.handleConn(ns.ctx, websocket.NetConn(ns.ctx, c, websocket.MessageText), r.RemoteAddr); err != nil {
+			log.Println(err)
+		}
+	})
+
+	go http.ListenAndServe(fmt.Sprintf("%s:%d", ns.cfg.Address, ns.cfg.WSPort), nil)
+
+	return nil
+}
+
+func (ns *NNTPServer) handleConn(ctx context.Context, conn net.Conn, remoteAddr string) error {
+	id, _ := uuid.NewUUID()
+	closed := make(chan bool)
+	session, err := NewSession(ctx, conn, remoteAddr, Capabilities, id.String(), closed, NewHandler(ns.backend, ns.cfg.Domain, ns.cfg.UploadPath))
+	if err != nil {
+		return err
+	}
+	ns.sessionPoolMutex.Lock()
+	ns.sessionPool[id.String()] = session
+	ns.sessionPoolMutex.Unlock()
+	go func(ctx context.Context, id string, closed chan bool) {
+		for {
+			select {
+			case <-ctx.Done():
+				break
+			case _, ok := <-closed:
+				{
+					if !ok {
+						ns.sessionPoolMutex.Lock()
+						delete(ns.sessionPool, id)
+						ns.sessionPoolMutex.Unlock()
+						return
+					}
+				}
+			}
+		}
+	}(ctx, id.String(), closed)
 
 	return nil
 }

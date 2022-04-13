@@ -12,6 +12,7 @@ const (
 type Config struct {
 	Address     string              `toml:"address"`
 	Port        int                 `toml:"port"`
+	WSPort      int                 `toml:"ws_port"`
 	BackendType string              `toml:"backend_type"`
 	Domain      string              `toml:"domain"`
 	SQLite      SQLiteBackendConfig `toml:"sqlite"`
