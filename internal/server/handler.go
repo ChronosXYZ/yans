@@ -116,9 +116,9 @@ func (h *Handler) handleList(s *Session, command string, arguments []string, id 
 					if err != nil {
 						return err
 					}
-					dw.Write([]byte(fmt.Sprintf("%s %d %d n"+protocol.CRLF, v.GroupName, highWaterMark, lowWaterMark)))
+					dw.Write([]byte(fmt.Sprintf("%s %d %d y"+protocol.CRLF, v.GroupName, highWaterMark, lowWaterMark)))
 				} else {
-					dw.Write([]byte(fmt.Sprintf("%s 0 1 n"+protocol.CRLF, v.GroupName)))
+					dw.Write([]byte(fmt.Sprintf("%s 0 1 y"+protocol.CRLF, v.GroupName)))
 				}
 			}
 			return dw.Close()

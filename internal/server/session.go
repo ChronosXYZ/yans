@@ -75,7 +75,7 @@ func (s *Session) loop() {
 		close(s.closed)
 	}()
 
-	err := s.tconn.PrintfLine(protocol.NNTPResponse{Code: 201, Message: "YANS NNTP Service Ready, posting prohibited"}.String()) // by default access mode is read-only
+	err := s.tconn.PrintfLine(protocol.NNTPResponse{Code: 201, Message: "YANS NNTP Service Ready, posting allowed"}.String()) // by default access mode is read-only
 	if err != nil {
 		s.conn.Close()
 		return
