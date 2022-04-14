@@ -22,4 +22,5 @@ type StorageBackend interface {
 	GetLastArticleByNum(g *models.Group, a *models.Article) (models.Article, error)
 	GetNextArticleByNum(g *models.Group, a *models.Article) (models.Article, error)
 	GetArticlesByRange(g *models.Group, low, high int64) ([]models.Article, error)
+	GetNewThreads(g *models.Group, perPage int, pageNum int) ([]int, error)
 }

@@ -232,3 +232,9 @@ func (sb *SQLiteBackend) GetNewArticlesSince(timestamp int64) ([]string, error) 
 	var articleIds []string
 	return articleIds, sb.db.Select(&articleIds, "SELECT json_extract(articles.header, '$.Message-Id[0]') FROM articles WHERE created_at > datetime(?, 'unixepoch')", timestamp)
 }
+
+func (sb *SQLiteBackend) GetNewThreads(g *models.Group, perPage int, pageNum int) ([]int, error) {
+	var numbers []int
+
+	return numbers, sb.db.Select(&numbers, "SELECT atg.article_number FROM articles INNER JOIN articles_to_groups atg on atg.article_id = articles.id WHERE atg.group_id = ? AND articles.thread IS NULL ORDER BY articles.created_at DESC LIMIT ? OFFSET ?", g.ID, perPage, perPage*pageNum)
+}
