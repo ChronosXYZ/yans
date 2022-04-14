@@ -79,12 +79,12 @@ func (sb *SQLiteBackend) GetArticlesCount(g *models.Group) (int, error) {
 
 func (sb *SQLiteBackend) GetGroupHighWaterMark(g *models.Group) (int, error) {
 	var waterMark int
-	return waterMark, sb.db.Get(&waterMark, "SELECT max(article_number) FROM articles_to_groups WHERE group_id = ?", g.ID)
+	return waterMark, sb.db.Get(&waterMark, "SELECT COALESCE(max(article_number), 0) FROM articles_to_groups WHERE group_id = ?", g.ID)
 }
 
 func (sb *SQLiteBackend) GetGroupLowWaterMark(g *models.Group) (int, error) {
 	var waterMark int
-	return waterMark, sb.db.Get(&waterMark, "SELECT min(article_number) FROM articles_to_groups WHERE group_id = ?", g.ID)
+	return waterMark, sb.db.Get(&waterMark, "SELECT COALESCE(min(article_number), 0) FROM articles_to_groups WHERE group_id = ?", g.ID)
 }
 
 func (sb *SQLiteBackend) GetGroup(groupName string) (models.Group, error) {
