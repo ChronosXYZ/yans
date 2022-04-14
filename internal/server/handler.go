@@ -335,11 +335,10 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 	a.Header = envelope.Root.Header
 	a.Envelope = envelope
 
-	// TODO handle multipart message
 	if err != nil {
 		return err
 	}
-	a.Body = string(envelope.Text)
+	a.Body = envelope.Text
 
 	// set thread property
 	if envelope.GetHeader("In-Reply-To") != "" {
@@ -351,10 +350,14 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 				return err
 			}
 		}
-		var parentHeader mail.Header
-		err = json.Unmarshal([]byte(parentMessage.HeaderRaw), &parentHeader)
-		parentMessageID := parentHeader.Get("Message-ID")
-		a.Thread = sql.NullString{String: parentMessageID, Valid: true}
+		if !parentMessage.Thread.Valid {
+			var parentHeader mail.Header
+			err = json.Unmarshal([]byte(parentMessage.HeaderRaw), &parentHeader)
+			parentMessageID := parentHeader.Get("Message-ID")
+			a.Thread = sql.NullString{String: parentMessageID, Valid: true}
+		} else {
+			a.Thread = parentMessage.Thread
+		}
 	}
 
 	if len(envelope.Attachments) > 0 {
