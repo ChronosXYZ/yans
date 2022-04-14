@@ -514,6 +514,7 @@ func (h *Handler) handleArticle(s *Session, command string, arguments []string, 
 		{
 			dw := s.tconn.DotWriter()
 			builder := utils.Builder()
+			_, err = dw.Write([]byte(protocol.NNTPResponse{Code: 220, Message: fmt.Sprintf("%d %s article", num, a.Header.Get("Message-ID"))}.String() + protocol.CRLF))
 			for k, v := range a.Header {
 				for _, j := range v {
 					builder = builder.Header(k, j)
