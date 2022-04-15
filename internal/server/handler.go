@@ -53,6 +53,7 @@ func NewHandler(b backend.StorageBackend, serverDomain, uploadPath string) *Hand
 
 		// project-specific extensions
 		"NEWTHREADS": h.handleNewThreads,
+		"THREAD":     h.handleThread,
 	}
 	h.serverDomain = serverDomain
 	h.uploadPath = uploadPath
@@ -899,6 +900,38 @@ func (h *Handler) handleNewThreads(s *Session, command string, arguments []strin
 
 	dw := s.tconn.DotWriter()
 	dw.Write([]byte(protocol.NNTPResponse{Code: 225, Message: "New thread numbers follows" + protocol.CRLF}.String()))
+	for _, v := range threadNums {
+		dw.Write([]byte(strconv.Itoa(v) + protocol.CRLF))
+	}
+	return dw.Close()
+}
+
+func (h *Handler) handleThread(s *Session, command string, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if s.currentGroup == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 412, Message: "no newsgroup selected"}.String())
+	}
+
+	if len(arguments) == 0 {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	threadNumber, err := strconv.Atoi(arguments[0])
+	if err != nil {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	threadNums, err := h.backend.GetThread(s.currentGroup, threadNumber)
+	if err != nil {
+		if err != sql.ErrNoRows {
+			return err
+		}
+	}
+
+	dw := s.tconn.DotWriter()
+	dw.Write([]byte(protocol.NNTPResponse{Code: 226, Message: "Thread articles follows" + protocol.CRLF}.String()))
 	for _, v := range threadNums {
 		dw.Write([]byte(strconv.Itoa(v) + protocol.CRLF))
 	}

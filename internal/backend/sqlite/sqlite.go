@@ -238,3 +238,9 @@ func (sb *SQLiteBackend) GetNewThreads(g *models.Group, perPage int, pageNum int
 
 	return numbers, sb.db.Select(&numbers, "SELECT atg.article_number FROM articles INNER JOIN articles_to_groups atg on atg.article_id = articles.id WHERE atg.group_id = ? AND articles.thread IS NULL ORDER BY articles.created_at DESC LIMIT ? OFFSET ?", g.ID, perPage, perPage*pageNum)
 }
+
+func (sb *SQLiteBackend) GetThread(g *models.Group, threadNum int) ([]int, error) {
+	var numbers []int
+
+	return numbers, sb.db.Select(&numbers, "SELECT atg.article_number FROM articles INNER JOIN articles_to_groups atg on atg.article_id = articles.id WHERE atg.group_id = ? AND articles.thread = json_extract((SELECT articles.header from articles INNER JOIN articles_to_groups a on articles.id = a.article_id WHERE a.group_id = ? AND a.article_number = ?), '$.Message-Id[0]') ORDER BY articles.created_at", g.ID, g.ID, threadNum)
+}
