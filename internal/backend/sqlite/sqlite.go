@@ -119,7 +119,7 @@ func (sb *SQLiteBackend) SaveArticle(a models.Article, groups []string) error {
 	}
 
 	for _, v := range groupIDs {
-		_, err = sb.db.Exec("INSERT INTO articles_to_groups (article_id, article_number, group_id) VALUES (?, (SELECT ifnull(max(article_number)+1, 1) FROM articles_to_groups), ?)", articleID, v)
+		_, err = sb.db.Exec("INSERT INTO articles_to_groups (article_id, article_number, group_id) VALUES (?, (SELECT ifnull(max(article_number)+1, 1) FROM articles_to_groups WHERE group_id = ?), ?)", articleID, v, v)
 		if err != nil {
 			return err
 		}
