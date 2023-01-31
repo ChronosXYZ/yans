@@ -6,18 +6,20 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"net/mail"
+	"path"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ChronosX88/yans/internal/backend"
 	"github.com/ChronosX88/yans/internal/models"
 	"github.com/ChronosX88/yans/internal/protocol"
 	"github.com/ChronosX88/yans/internal/utils"
 	"github.com/google/uuid"
 	"github.com/jhillyerd/enmime"
-	"io/ioutil"
-	"net/mail"
-	"path"
-	"strconv"
-	"strings"
-	"time"
 )
 
 type Handler struct {
@@ -50,6 +52,7 @@ func NewHandler(b backend.StorageBackend, serverDomain, uploadPath string) *Hand
 		protocol.CommandNext:         h.handleNext,
 		protocol.CommandOver:         h.handleOver,
 		protocol.CommandXover:        h.handleOver,
+		protocol.CommandIHave:        h.handleIHave,
 
 		// project-specific extensions
 		"NEWTHREADS": h.handleNewThreads,
@@ -319,15 +322,31 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 		return err
 	}
 
-	// generate message id
-	messageID := fmt.Sprintf("<%s@%s>", uuid.New().String(), h.serverDomain)
-	envelope.SetHeader("Message-ID", []string{messageID})
+	h.saveArticle(envelope, true)
+	if err != nil {
+		if err.Error() == "no such message you are replying to" {
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: "no such message you are replying to"}.String())
+		} else if err.Error() == "disallowed attachment type" {
+			return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: "disallowed attachment type"}.String())
+		}
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: err.Error()}.String())
+	}
 
-	// set path header
-	envelope.SetHeader("Path", []string{fmt.Sprintf("%s!not-for-mail", h.serverDomain)})
+	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 240, Message: "Article received OK"}.String())
+}
 
-	// set date header
-	envelope.AddHeader("Date", time.Now().UTC().Format(time.RFC1123Z))
+func (h *Handler) saveArticle(envelope *enmime.Envelope, generateHeaders bool) error {
+	if generateHeaders {
+		// generate message id
+		messageID := fmt.Sprintf("<%s@%s>", uuid.New().String(), h.serverDomain)
+		envelope.SetHeader("Message-ID", []string{messageID})
+
+		// set path header
+		envelope.SetHeader("Path", []string{fmt.Sprintf("%s!not-for-mail", h.serverDomain)})
+
+		// set date header
+		envelope.AddHeader("Date", time.Now().UTC().Format(time.RFC1123Z))
+	}
 
 	headerJson, err := json.Marshal(envelope.Root.Header)
 	if err != nil {
@@ -348,8 +367,9 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 	if envelope.GetHeader("In-Reply-To") != "" {
 		parentMessage, err := h.backend.GetArticle(envelope.GetHeader("In-Reply-To"))
 		if err != nil {
+			return err
 			if err == sql.ErrNoRows {
-				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: "no such message you are replying to"}.String())
+				return fmt.Errorf("no such message you are replying to")
 			} else {
 				return err
 			}
@@ -368,7 +388,7 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 		// save attachments
 		for _, v := range envelope.Attachments {
 			if v.ContentType != "image/jpeg" && v.ContentType != "image/png" && v.ContentType != "image/gif" {
-				return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: "disallowed attachment type"}.String())
+				return fmt.Errorf("disallowed attachment type")
 			}
 			ext_ := strings.Split(v.FileName, ".")
 			ext := ext_[len(ext_)-1]
@@ -386,10 +406,10 @@ func (h *Handler) handlePost(s *Session, command string, arguments []string, id 
 
 	err = h.backend.SaveArticle(a, strings.Split(a.Header.Get("Newsgroups"), ","))
 	if err != nil {
-		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 441, Message: err.Error()}.String())
+		return err
 	}
 
-	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 240, Message: "Article received OK"}.String())
+	return nil
 }
 
 func (h *Handler) handleListgroup(s *Session, command string, arguments []string, id uint) error {
@@ -936,6 +956,47 @@ func (h *Handler) handleThread(s *Session, command string, arguments []string, i
 		dw.Write([]byte(strconv.Itoa(v) + protocol.CRLF))
 	}
 	return dw.Close()
+}
+
+func (h *Handler) handleIHave(s *Session, command string, arguments []string, id uint) error {
+	s.tconn.StartResponse(id)
+	defer s.tconn.EndResponse(id)
+
+	if len(arguments) != 1 {
+		return s.tconn.PrintfLine(protocol.ErrSyntaxError.String())
+	}
+
+	if _, err := h.backend.GetArticle(arguments[0]); err == nil {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 435, Message: "Duplicate"}.String())
+	} else {
+		log.Print(err.Error())
+	}
+
+	if err := s.tconn.PrintfLine(protocol.NNTPResponse{Code: 335, Message: "Send it; end with <CR-LF>.<CR-LF>"}.String()); err != nil {
+		return err
+	}
+	// TODO restrict sending the same article from other users
+
+	dr := s.tconn.DotReader()
+
+	envelope, err := enmime.ReadEnvelope(dr)
+	if err != nil {
+		return err
+	}
+
+	msgID := envelope.GetHeader("Message-ID")
+	if msgID == "" {
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 436, Message: "Transfer failed"}.String())
+	}
+	// TODO also check whether message id in the article is the same as was previously
+
+	err = h.saveArticle(envelope, false)
+	if err != nil {
+		// TODO add proper error handling
+		return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 436, Message: fmt.Sprintf("Transfer failed: %s", err.Error())}.String())
+	}
+
+	return s.tconn.PrintfLine(protocol.NNTPResponse{Code: 235, Message: "Article transferred OK"}.String())
 }
 
 func (h *Handler) Handle(s *Session, message string, id uint) error {

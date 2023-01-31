@@ -66,6 +66,7 @@ const (
 	CommandNext         = "NEXT"
 	CommandOver         = "OVER"
 	CommandXover        = "XOVER"
+	CommandIHave        = "IHAVE"
 )
 
 const (

@@ -22,6 +22,7 @@ var (
 		{Type: protocol.ImplementationCapability, Params: fmt.Sprintf("%s %s", common.ServerName, common.ServerVersion)},
 		{Type: protocol.OverCapability, Params: "MSGID"},
 		{Type: protocol.ModeReaderCapability},
+		{Type: protocol.IHaveCapability},
 	}
 )
 
